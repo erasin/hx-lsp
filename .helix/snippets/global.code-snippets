@@ -1,0 +1,7 @@
+{
+  "testa": {
+    "prefix": "testa",
+    "body": "testa: ${1:abc} D: ${2:cde}",
+    "description": "test a info content"
+  }
+}

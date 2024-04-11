@@ -1,0 +1,26 @@
+[package]
+name = "hx-lsp"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.82"
+crossbeam-channel = "0.5.12"
+flexi_logger = "0.28.0"
+itertools = "0.12.1"
+log = "0.4.21"
+lsp-server = "0.7.6"
+lsp-types = "0.95.1"
+miette = "7.2.0"
+nucleo = "0.5.0"
+parking_lot = "0.12.1"
+serde = { version = "1.0.197", features = ["derive"] }
+serde_json = "1.0.115"
+thiserror = "1.0.58"
+url = "2.5.0"
+
+[profile.release]
+opt-level = "z"
+lto = true
