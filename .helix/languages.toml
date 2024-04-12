@@ -2,11 +2,6 @@
 command = "target/debug/hx-lsp"
 args = ["--log"] # for dev
 
-# dev
-[language-server.hx-lsp.config]
-editor="helix"
-path="~/.config/utils-lsp"
-
 [[language]]
 name = "markdown"
 text-width = 80
