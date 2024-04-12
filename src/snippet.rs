@@ -1,4 +1,9 @@
-use std::{collections::HashMap, fs::File, io::BufReader, path::PathBuf};
+use std::{
+    collections::HashMap,
+    fs::File,
+    io::BufReader,
+    path::{Path, PathBuf},
+};
 
 use lsp_types::{CompletionItem, CompletionItemKind, Documentation};
 use serde::{Deserialize, Serialize};
@@ -6,7 +11,6 @@ use serde_json::{from_value, Value};
 
 use crate::{
     errors::Error,
-    fuzzy::fuzzy_match,
     loader::{config_dir, Dirs},
 };
 
@@ -76,25 +80,42 @@ pub struct Lang {
 }
 
 impl Lang {
-    pub fn get_global() -> Lang {
-        todo!()
+    pub fn get_global() -> Option<Lang> {
+        let global_all: HashMap<String, Snippet> = read_names(&config_dir(Dirs::Snippets))
+            .iter()
+            .map(|p| parse(p, p.file_stem().unwrap().to_string_lossy().into_owned()).ok())
+            .filter(|l| l.is_some())
+            .map(|l| l.unwrap().snippets)
+            // .flat_map(|m| m.iter())
+            .fold(HashMap::new(), |mut acc, map| {
+                acc.extend(map);
+                acc
+            });
+
+        // TODO: project
+
+        if global_all.is_empty() {
+            None
+        } else {
+            Some(Lang {
+                name: "global".to_owned(),
+                snippets: global_all,
+            })
+        }
     }
 
-    pub fn get_lang(name: String) -> Result<Lang, Error> {
-        let file_name = format!("{}.json", name.clone().to_lowercase());
-
+    pub fn get_lang(lang_name: String) -> Result<Lang, Error> {
+        let file_name = format!("{}.json", lang_name.clone().to_lowercase());
         let lang_file_path = config_dir(Dirs::Snippets).join(file_name);
+        let lang = parse(&lang_file_path, lang_name)?;
 
-        let file = File::open(lang_file_path)?;
-        let rdr = BufReader::new(file);
-
-        // parse
-        let lang = Lang {
-            name,
-            snippets: serde_json::from_reader(rdr)?,
-        };
+        // TODO: project
 
         Ok(lang)
+    }
+
+    pub fn extend(&mut self, other: Lang) {
+        self.snippets.extend(other.snippets);
     }
 
     pub fn get_completion_items(&self) -> Vec<CompletionItem> {
@@ -107,11 +128,32 @@ impl Lang {
     }
 }
 
+fn read_names(path: &PathBuf) -> Vec<PathBuf> {
+    std::fs::read_dir(path)
+        .map(|entries| {
+            entries
+                .filter_map(|entry| {
+                    let entry = entry.ok()?;
+                    let path = entry.path();
+                    (path.extension()? == "code-snippet").then(|| path)
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn parse(lang_file_path: &PathBuf, name: String) -> Result<Lang, Error> {
+    let file = File::open(lang_file_path)?;
+    let rdr = BufReader::new(file);
+    let lang = Lang {
+        name,
+        snippets: serde_json::from_reader(rdr)?,
+    };
+    Ok(lang)
+}
+
 #[cfg(test)]
 mod test {
-    use std::collections::HashMap;
-
-    use itertools::assert_equal;
 
     use super::Lang;
 
@@ -119,7 +161,7 @@ mod test {
     fn test_get_lang() {
         let lang = Lang::get_lang("markdown".to_owned());
 
-        eprintln!("{lang:?}");
+        // eprintln!("{lang:?}");
         match lang {
             Ok(lang) => {
                 assert_eq!(lang.name, "markdown".to_owned(),);

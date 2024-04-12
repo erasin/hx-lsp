@@ -1,14 +1,15 @@
 // dev
-#![allow(dead_code, unused_imports)]
+// #![allow(dead_code, unused_imports)]
 
-use std::{collections::HashMap, io::Write, path::PathBuf};
+use std::{collections::HashMap, path::PathBuf};
 
+use flexi_logger::{FileSpec, Logger, WriteMode};
 use log::{info, trace};
 use lsp_server::Connection;
 use lsp_types::{
     notification::{DidCloseTextDocument, DidOpenTextDocument, Notification},
     request::{CodeActionRequest, Completion, Request},
-    CodeAction, CompletionItem, CompletionItemKind, InitializeParams, ServerCapabilities,
+    CodeAction, InitializeParams, ServerCapabilities,
 };
 
 mod action;
@@ -18,9 +19,6 @@ mod loader;
 mod snippet;
 
 use errors::Error;
-
-use flexi_logger::{FileSpec, Logger, WriteMode};
-use serde::de::IntoDeserializer;
 use snippet::Lang;
 
 fn main() -> Result<(), Error> {
@@ -64,8 +62,8 @@ fn run_lsp_server() -> Result<(), Error> {
     };
     let initialization_params: InitializeParams = serde_json::from_value(initialization_params)?;
 
-    let mut server = Server::new(initialization_params);
-    server.listen(connection)?;
+    let mut server = Server::new(&initialization_params);
+    server.listen(&connection)?;
     io_threads.join()?;
 
     // Shut down gracefully.
@@ -75,7 +73,7 @@ fn run_lsp_server() -> Result<(), Error> {
 }
 
 pub struct Server {
-    root: PathBuf,
+    // root: PathBuf,
     // config: Config
     lang_states: HashMap<String, String>,
     // snippets
@@ -83,15 +81,20 @@ pub struct Server {
 }
 
 impl Server {
-    fn new(params: InitializeParams) -> Self {
+    fn new(params: &InitializeParams) -> Self {
+        // get workpath
+        // let project_path = params.root_uri.unwrap().clone();
+
+        // params.initialization_options.unwrap().get("path")
+
         Server {
-            root: PathBuf::new(),
+            // root: PathBuf::from(project_path.path()),
             lang_states: HashMap::new(),
-            params,
+            params: params.clone(),
         }
     }
 
-    fn listen(&mut self, connection: Connection) -> Result<(), Error> {
+    fn listen(&mut self, connection: &Connection) -> Result<(), Error> {
         info!("starting example main loop");
 
         while let Ok(msg) = connection.receiver.recv() {
@@ -200,36 +203,18 @@ impl Server {
         &self,
         params: lsp_types::CompletionParams,
     ) -> Option<Vec<lsp_types::CompletionItem>> {
-        // let completion_items = if let Some(lang) =
         let lang_name = self
             .lang_states
             .get(params.text_document_position.text_document.uri.path())?;
 
-        let lang = Lang::get_lang(lang_name.to_owned()).ok()?;
+        let mut lang = Lang::get_lang(lang_name.to_owned()).ok()?;
+        let global = Lang::get_global()?;
 
-        // let mut items = Vec::new();
+        lang.extend(global);
 
         let items = lang.get_completion_items();
+
         Some(items)
-
-        // if !items.is_empty() {
-        //     Some(items)
-        // }
-
-        // None
-
-        // items.push(CompletionItem {
-        //     label: "text1".to_owned(),
-        //     kind: Some(CompletionItemKind::SNIPPET),
-        //     detail: Some("text1 detail".to_owned()),
-        //     documentation: Some(lsp_types::Documentation::String(
-        //         "document text1".to_owned(),
-        //     )),
-        //     insert_text: Some("test1 $1 - $2".to_owned()),
-        //     ..Default::default()
-        // });
-
-        // Some(items)
     }
 }
 

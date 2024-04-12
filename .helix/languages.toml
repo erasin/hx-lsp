@@ -2,6 +2,11 @@
 command = "target/debug/hx-lsp"
 args = ["--log"] # for dev
 
+[language-server.hx-lsp.config]
+arg1="test1"
+path="~/.config/snippets"
+
+
 [[language]]
 name = "markdown"
 text-width = 80
