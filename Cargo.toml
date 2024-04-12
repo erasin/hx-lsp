@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.82"
 crossbeam-channel = "0.5.12"
+etcetera = "0.8.0"
 flexi_logger = "0.28.0"
 itertools = "0.12.1"
 log = "0.4.21"

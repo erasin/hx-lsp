@@ -1,0 +1,25 @@
+{
+  "markdown a": {
+    "prefix": "mda",
+    "body": "mda: ${1:abc} : ${2:cde}",
+    "description": "test a info content"
+  },
+  "markdown b": {
+    "prefix": [
+      "mdb"
+    ],
+    "body": "mdb: ${1:abc} : ${2:cde}",
+    "description": "test b info content"
+  },
+  "markdown c": {
+    "prefix": [
+      "mdc",
+      "mdd"
+    ],
+    "body": [
+      "mda: ${1:abc} : ${2:cde}",
+      "test"
+    ],
+    "description": "test c,d info content"
+  }
+}

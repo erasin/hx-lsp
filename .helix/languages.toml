@@ -1,5 +1,6 @@
 [language-server.hx-lsp]
 command = "target/debug/hx-lsp"
+args = ["--log"] # for dev
 
 [[language]]
 name = "markdown"

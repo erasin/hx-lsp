@@ -1,32 +1,43 @@
-use std::{collections::HashMap, path::PathBuf};
+// dev
+#![allow(dead_code, unused_imports)]
+
+use std::{collections::HashMap, io::Write, path::PathBuf};
 
 use log::{info, trace};
 use lsp_server::Connection;
 use lsp_types::{
-    notification::{
-        DidChangeTextDocument, DidChangeWatchedFiles, DidCloseTextDocument, DidOpenTextDocument,
-        DidSaveTextDocument, Notification, Progress, PublishDiagnostics, ShowMessage,
-    },
-    request::{
-        CodeActionRequest, Completion, Formatting, GotoDefinition, HoverRequest, Request,
-        WorkDoneProgressCreate,
-    },
-    CompletionItem, CompletionItemKind, DocumentFormattingParams, InitializeParams,
-    ServerCapabilities, TextEdit,
+    notification::{DidCloseTextDocument, DidOpenTextDocument, Notification},
+    request::{CodeActionRequest, Completion, Request},
+    CodeAction, CompletionItem, CompletionItemKind, InitializeParams, ServerCapabilities,
 };
 
+mod action;
 mod errors;
 mod fuzzy;
+mod loader;
+mod snippet;
 
 use errors::Error;
 
 use flexi_logger::{FileSpec, Logger, WriteMode};
+use serde::de::IntoDeserializer;
+use snippet::Lang;
 
 fn main() -> Result<(), Error> {
-    let _logger = Logger::try_with_str("trace, my::critical::module=trace")?
-        .log_to_file(FileSpec::default())
-        .write_mode(WriteMode::BufferAndFlush)
-        .start()?;
+    if let Some(arg) = std::env::args().nth(1) {
+        if arg.eq("--version") {
+            let version = env!("CARGO_PKG_VERSION");
+            eprintln!("version: {version}");
+            return Ok(());
+        }
+
+        if arg.eq("--log") {
+            let _logger = Logger::try_with_str("trace, my::critical::module=trace")?
+                .log_to_file(FileSpec::default())
+                .write_mode(WriteMode::BufferAndFlush)
+                .start()?;
+        }
+    }
 
     run_lsp_server()
 }
@@ -52,8 +63,6 @@ fn run_lsp_server() -> Result<(), Error> {
         }
     };
     let initialization_params: InitializeParams = serde_json::from_value(initialization_params)?;
-
-    // main_loop(connection, initialization_params)?;
 
     let mut server = Server::new(initialization_params);
     server.listen(connection)?;
@@ -134,19 +143,19 @@ impl Server {
                 })
             }
 
-            // CodeActionRequest::METHOD => {
-            //     let params =
-            //         cast_request::<CodeActionRequest>(request).expect("cast code action request");
+            CodeActionRequest::METHOD => {
+                //     let params =
+                //         cast_request::<CodeActionRequest>(request).expect("cast code action request");
 
-            //     // TODO action for tmux open window ...
-            //     let mut actions = Vec::new();
+                // TODO action for tmux open window ...
+                let actions: Vec<CodeAction> = Vec::new();
 
-            //     Ok(lsp_server::Response {
-            //         id,
-            //         error: None,
-            //         result: Some(serde_json::to_value(action)?),
-            //     })
-            // }
+                Ok(lsp_server::Response {
+                    id,
+                    error: None,
+                    result: Some(serde_json::to_value(actions)?),
+                })
+            }
             unsupported => Err(Error::UnsupportedLspRequest {
                 request: unsupported.to_string(),
             }),
@@ -192,21 +201,35 @@ impl Server {
         params: lsp_types::CompletionParams,
     ) -> Option<Vec<lsp_types::CompletionItem>> {
         // let completion_items = if let Some(lang) =
-        // state.get(&params.text_document_position.text_document.uri)
-        let mut items = Vec::new();
+        let lang_name = self
+            .lang_states
+            .get(params.text_document_position.text_document.uri.path())?;
 
-        items.push(CompletionItem {
-            label: "text1".to_owned(),
-            kind: Some(CompletionItemKind::SNIPPET),
-            detail: Some("text1 detail".to_owned()),
-            documentation: Some(lsp_types::Documentation::String(
-                "document text1".to_owned(),
-            )),
-            insert_text: Some("test1 $1 - $2".to_owned()),
-            ..Default::default()
-        });
+        let lang = Lang::get_lang(lang_name.to_owned()).ok()?;
 
+        // let mut items = Vec::new();
+
+        let items = lang.get_completion_items();
         Some(items)
+
+        // if !items.is_empty() {
+        //     Some(items)
+        // }
+
+        // None
+
+        // items.push(CompletionItem {
+        //     label: "text1".to_owned(),
+        //     kind: Some(CompletionItemKind::SNIPPET),
+        //     detail: Some("text1 detail".to_owned()),
+        //     documentation: Some(lsp_types::Documentation::String(
+        //         "document text1".to_owned(),
+        //     )),
+        //     insert_text: Some("test1 $1 - $2".to_owned()),
+        //     ..Default::default()
+        // });
+
+        // Some(items)
     }
 }
 
