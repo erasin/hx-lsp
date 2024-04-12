@@ -135,7 +135,7 @@ fn read_names(path: &PathBuf) -> Vec<PathBuf> {
                 .filter_map(|entry| {
                     let entry = entry.ok()?;
                     let path = entry.path();
-                    (path.extension()? == "code-snippet").then(|| path)
+                    (path.extension()? == "code-snippets").then(|| path)
                 })
                 .collect()
         })

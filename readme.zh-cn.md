@@ -1,6 +1,7 @@
 # hx-lsp
 
-[![中文文档](https://img.shields.io/badge/lang-zh-CN-blue.svg)](./README.zh-cn.md)
+[![English](https://img.shields.io/badge/lang-english-blue.svg)](./README.md)
+
 
 ## install 
 

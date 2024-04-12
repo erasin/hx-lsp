@@ -2,10 +2,10 @@
 command = "target/debug/hx-lsp"
 args = ["--log"] # for dev
 
+# dev
 [language-server.hx-lsp.config]
-arg1="test1"
-path="~/.config/snippets"
-
+editor="helix"
+path="~/.config/utils-lsp"
 
 [[language]]
 name = "markdown"
