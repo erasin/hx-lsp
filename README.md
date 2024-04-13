@@ -29,10 +29,12 @@ snippet 定义为兼容 [vscode snippets](https://code.visualstudio.com/docs/edi
 
 为了更好的使用 snippet 建议 heliix 合并 [helix#9081](https://github.com/helix-editor/helix/pull/9801) 以支持 smart-tab。
 
-文件加载路径顺序为：
+配置 helix config 开启 `editor.auto-completion`,或者使用 `Ctrl+x` 打开补全列表。 
+
+snippet 文件加载路径顺序为：
 
 - [ ] `WORKSPACE_ROOT/.helix/snippets/`
-- [o] `$XDG_CONFIG_HOME/helix/snippets/`
+- [x] `$XDG_CONFIG_HOME/helix/snippets/`
 
 加载的文件为 `语言id.json`, 和 `xxx.code-snippets` 全局文件。
 
