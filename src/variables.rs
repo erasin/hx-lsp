@@ -9,9 +9,15 @@ use uuid::Uuid;
 // where
 //     R: lsp_types::request::Request,
 //     R::Params: serde::de::DeserializeOwned,
-pub fn convert(str: &mut String) {}
+pub fn convert(str: &mut String) {
+    // let a = Variables::to_vec()
+    //     .into_iter()
+    //     .map(|v| (v.to_string(), v))
+    // .map(|x|)
+}
 
 /// 兼容 [vscode snippet variables](https://code.visualstudio.com/docs/editor/userdefinedsnippets#_variables)
+#[derive(Debug, Clone, Copy)]
 pub enum Variables {
     // The following variables can be used:
     /// The currently selected text or the empty string
@@ -135,6 +141,46 @@ impl ToString for Variables {
 }
 
 impl Variables {
+    fn to_vec() -> Vec<Variables> {
+        [
+            // Variables::TmSelectedText,
+            // Variables::TmCurrentLine,
+            // Variables::TmCurrentWord,
+            Variables::TmLineIndex,
+            Variables::TmLineNumber,
+            Variables::TmFilename,
+            Variables::TmFilenameBase,
+            Variables::TmDirectory,
+            Variables::TmFilepath,
+            Variables::RelativeFilepath,
+            // Variables::Clipboard,
+            Variables::WorkspaceName,
+            Variables::WorkspaceFolder,
+            // Variables::CursorIndex,
+            // Variables::CursorNumber,
+            Variables::CurrentYear,
+            Variables::CurrentYearShort,
+            Variables::CurrentMonth,
+            Variables::CurrentMonthName,
+            Variables::CurrentMonthNameShort,
+            Variables::CurrentDate,
+            Variables::CurrentDayName,
+            Variables::CurrentDayNameShort,
+            Variables::CurrentHour,
+            Variables::CurrentMinute,
+            Variables::CurrentSecond,
+            Variables::CurrentSecondsUnix,
+            Variables::CurrentTimezoneOffset,
+            Variables::Random,
+            Variables::RandomHex,
+            Variables::Uuid,
+            // Variables::BlockCommentStart,
+            // Variables::BlockCommentEnd,
+            // Variables::LineComment,
+        ]
+        .to_vec()
+    }
+
     pub fn convert(&self) -> String {
         match self {
             Variables::TmSelectedText => todo!(),

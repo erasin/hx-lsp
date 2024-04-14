@@ -2,11 +2,12 @@ use std::{collections::HashMap, fs::File, io::BufReader, path::PathBuf};
 
 use json_comments::StripComments;
 use lsp_types::{CompletionItem, CompletionItemKind};
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::{
     errors::Error,
     loader::{config_dir, Dirs},
+    parser::{parse, Parser, StrOrSeq},
 };
 
 /// 代码片段
@@ -32,34 +33,6 @@ pub struct Snippet {
     description: Option<String>,
 }
 
-/// `String` 或者 `Vec<String>`
-#[derive(Deserialize, Serialize, Clone, Debug)]
-#[serde(untagged)]
-pub enum StrOrSeq {
-    String(String),
-    Array(Vec<String>),
-}
-
-impl ToString for StrOrSeq {
-    /// `Vec<String>` 使用 `\n` 组合为 String
-    fn to_string(&self) -> String {
-        match self {
-            StrOrSeq::String(s) => s.clone(),
-            StrOrSeq::Array(v) => v.join("\n").clone(),
-        }
-    }
-}
-
-impl StrOrSeq {
-    /// 获取第一个元素
-    fn first(&self) -> Option<String> {
-        match self {
-            StrOrSeq::String(s) => Some(s.clone()),
-            StrOrSeq::Array(v) => v.first().and_then(|s| Some(s.clone())),
-        }
-    }
-}
-
 impl Snippet {
     /// 转换为 lsp 类型 CompletionItem
     fn to_completion_item(&self) -> Option<CompletionItem> {
@@ -83,29 +56,43 @@ impl Snippet {
 }
 
 /// 语言包
-#[derive(Deserialize, Debug)]
-pub struct Lang {
+#[derive(Deserialize, Serialize, Clone, Debug)]
+pub struct Snippets {
     name: String,
     snippets: HashMap<String, Snippet>,
 }
 
-impl Default for Lang {
+impl Default for Snippets {
     fn default() -> Self {
-        Lang::new("default".to_owned(), HashMap::new())
+        Snippets::new("default".to_owned(), HashMap::new())
     }
 }
 
-impl Lang {
-    pub fn new(name: String, snippets: HashMap<String, Snippet>) -> Lang {
-        Lang { name, snippets }
+impl Parser for Snippets {
+    type Item = Snippet;
+
+    fn set_name(&mut self, name: String) {
+        self.name = name;
+    }
+
+    fn set_hasmap(&mut self, hs: HashMap<String, Self::Item>) {
+        self.snippets = hs;
+    }
+}
+
+impl Snippets {
+    pub fn new(name: String, snippets: HashMap<String, Snippet>) -> Snippets {
+        Snippets { name, snippets }
     }
 
     /// 获取 XDG_CONFIG_HOME 下的 `code-snippets` 全局片段文件
     /// 获取 workspace 项目目录下的 `code-snippets` 文件
-    pub fn get_global() -> Result<Lang, Error> {
+    pub fn get_global() -> Result<Snippets, Error> {
         let global_all: HashMap<String, Snippet> = read_names(&config_dir(Dirs::Snippets))
             .into_iter()
-            .map(|p| parse(&p, p.file_stem().unwrap().to_string_lossy().into_owned()).ok())
+            .map(|p| {
+                parse::<Snippets>(&p, p.file_stem().unwrap().to_string_lossy().into_owned()).ok()
+            })
             .filter(|l| l.is_some())
             .map(|l| l.unwrap().snippets)
             .fold(HashMap::new(), |mut acc, map| {
@@ -118,7 +105,7 @@ impl Lang {
         if global_all.is_empty() {
             Err(Error::NotFound("Global Snippets".to_owned()))
         } else {
-            Ok(Lang {
+            Ok(Snippets {
                 name: "global".to_owned(),
                 snippets: global_all,
             })
@@ -126,10 +113,10 @@ impl Lang {
     }
 
     /// 获取 XDG_CONFIG_HOME 下的 `langid.json` 语言文件
-    pub fn get_lang(lang_name: String) -> Result<Lang, Error> {
+    pub fn get_lang(lang_name: String) -> Result<Snippets, Error> {
         let file_name = format!("{}.json", lang_name.clone().to_lowercase());
         let lang_file_path = config_dir(Dirs::Snippets).join(file_name);
-        let lang = parse(&lang_file_path, lang_name)?;
+        let lang = parse::<Snippets>(&lang_file_path, lang_name)?;
 
         // TODO: project
 
@@ -137,12 +124,12 @@ impl Lang {
     }
 
     /// 合并 snippets
-    pub fn extend(&mut self, other: Lang) {
+    pub fn extend(&mut self, other: Snippets) {
         self.snippets.extend(other.snippets);
     }
 
     /// 转换 snippets 为 lsp 的提示类型
-    pub fn get_completion_items(&self) -> Vec<CompletionItem> {
+    pub fn to_completion_items(&self) -> Vec<CompletionItem> {
         self.snippets
             .iter()
             .map(|(_name, snippet)| snippet.to_completion_item())
@@ -167,35 +154,14 @@ fn read_names(path: &PathBuf) -> Vec<PathBuf> {
         .unwrap_or_default()
 }
 
-/// 解析 `code-snippets json` 文件
-fn parse(lang_file_path: &PathBuf, name: String) -> Result<Lang, Error> {
-    let file = File::open(lang_file_path)?;
-    let reader = BufReader::new(file);
-
-    // 过滤注释内容
-    let json_data = StripComments::new(reader);
-
-    // 日志记录错误
-    let snippets = match serde_json::from_reader(json_data) {
-        Ok(s) => s,
-        Err(err) => {
-            log::error!("parse fail: {err:?}");
-            return Err(err.into());
-        }
-    };
-
-    let lang = Lang { name, snippets };
-    Ok(lang)
-}
-
 #[cfg(test)]
 mod test {
 
-    use super::Lang;
+    use super::Snippets;
 
     #[test]
     fn test_get_lang() {
-        let lang = Lang::get_lang("markdown".to_owned());
+        let lang = Snippets::get_lang("markdown".to_owned());
 
         // eprintln!("{lang:?}");
         match lang {

@@ -15,11 +15,12 @@ mod action;
 mod errors;
 mod fuzzy;
 mod loader;
+mod parser;
 mod snippet;
 mod variables;
 
 use errors::Error;
-use snippet::Lang;
+use snippet::Snippets;
 
 fn main() -> Result<(), Error> {
     if let Some(arg) = std::env::args().nth(1) {
@@ -148,7 +149,8 @@ impl Server {
 
             // 获取可能存在的 脚本处理
             CodeActionRequest::METHOD => {
-                // let params = cast_request::<CodeActionRequest>(request).expect("cast code action request");
+                let params =
+                    cast_request::<CodeActionRequest>(request).expect("cast code action request");
 
                 // TODO action for tmux open window ...
                 let actions: Vec<CodeAction> = Vec::new();
@@ -219,16 +221,19 @@ impl Server {
         //     lang.extend(global);
         // }
 
-        let lang = [Lang::get_lang(lang_name.to_owned()), Lang::get_global()]
-            .into_iter()
-            .filter(|r| r.is_ok())
-            .map(move |r| r.unwrap())
-            .fold(Lang::default(), |mut lang, other| {
-                lang.extend(other);
-                lang
-            });
+        let lang = [
+            Snippets::get_lang(lang_name.to_owned()),
+            Snippets::get_global(),
+        ]
+        .into_iter()
+        .filter(|r| r.is_ok())
+        .map(move |r| r.unwrap())
+        .fold(Snippets::default(), |mut lang, other| {
+            lang.extend(other);
+            lang
+        });
 
-        let items = lang.get_completion_items();
+        let items = lang.to_completion_items();
         Some(items)
     }
 }
