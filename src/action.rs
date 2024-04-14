@@ -1,30 +1,55 @@
 use std::{
     collections::HashMap,
+    path::PathBuf,
     process::{Command, Stdio},
 };
 
-use lsp_types::CodeAction;
+use lsp_types::{CodeAction, WorkspaceEdit};
+use ropey::Rope;
 use serde::{Deserialize, Serialize};
 
 use crate::{
     errors::Error,
-    loader::config_dir,
-    parser::{Parser, StrOrSeq},
+    loader::{config_dir, Dirs},
+    parser::{parse, Parser, StrOrSeq},
 };
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct Action {
-    /// 捕捉
-    catch: String,
-    prefix: StrOrSeq, // string
-    body: StrOrSeq,   // string
+    /// 捕捉, 支持单行或者两行
+    title: String,
+    catch: StrOrSeq,
+    shell: StrOrSeq, // string
     description: Option<String>,
 }
 
 impl Action {
     /// 转换 lsp 格式
     fn to_code_action_item(&self) -> Option<CodeAction> {
-        todo!()
+        if self.catch.first().is_none() {
+            return None;
+        }
+
+        let command = lsp_types::Command {
+            title: "Run Test".to_string(),
+            command: self.shell.to_string(),
+            arguments: None,
+        };
+
+        let action = CodeAction {
+            title: self.title.clone(),
+            kind: Some(lsp_types::CodeActionKind::EMPTY),
+            // kind: Some("command".into()),
+            command: Some(command),
+            // diagnostics: Some(vec![diagnostic.clone()]),
+            is_preferred: Some(true),
+            diagnostics: None,
+            disabled: None,
+            data: None,
+            ..Default::default()
+        };
+
+        Some(action)
     }
 
     /// 获取 description, 兼容空对象
@@ -66,15 +91,23 @@ impl Actions {
         Actions { name, actions }
     }
 
-    pub fn get_lang(lang_name: String) -> Result<Actions, Error> {
-        // let file_name = format!("{}.json", lang_name.clone().to_lowercase());
-        // let lang_file_path = config_dir(Dirs::Snippets).join(file_name);
-        // let lang = parse(&lang_file_path, lang_name)?;
+    /// .
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if .
+    pub fn get_lang(
+        lang_name: String,
+        file_content: &Rope,
+        project_root: &PathBuf,
+    ) -> Result<Actions, Error> {
+        let file_name = format!("{}.json", lang_name.clone().to_lowercase());
+        let actions_file_path = config_dir(Dirs::Actions).join(file_name);
+        let actions = parse::<Actions>(&actions_file_path, lang_name)?;
 
-        // // TODO: project
+        // TODO: project
 
-        // Ok(lang)
-        todo!()
+        Ok(actions)
     }
 
     pub fn to_code_action_items(&self) -> Vec<CodeAction> {
@@ -120,7 +153,7 @@ mod test {
 
     #[test]
     fn test_shell_exec() {
-        let re = shell_exec("tmux split-window -h; tmux send hx Enter");
+        let re = shell_exec("tmux split-window -h\n tmux send hx Enter");
         eprintln!("{re:?}");
     }
 }

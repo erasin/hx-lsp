@@ -32,7 +32,7 @@ where
     };
 
     let mut p: T = Default::default();
-    p.set_name(name);
+    p.set_name(name.into());
     p.set_hasmap(hs);
 
     Ok(p)

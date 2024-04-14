@@ -87,7 +87,15 @@ impl Snippets {
 
     /// 获取 XDG_CONFIG_HOME 下的 `code-snippets` 全局片段文件
     /// 获取 workspace 项目目录下的 `code-snippets` 文件
-    pub fn get_global() -> Result<Snippets, Error> {
+    ///
+    /// # Panics
+    ///
+    /// Panics if .
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if .
+    pub fn get_global(project_root: &PathBuf) -> Result<Snippets, Error> {
         let global_all: HashMap<String, Snippet> = read_names(&config_dir(Dirs::Snippets))
             .into_iter()
             .map(|p| {
@@ -113,14 +121,14 @@ impl Snippets {
     }
 
     /// 获取 XDG_CONFIG_HOME 下的 `langid.json` 语言文件
-    pub fn get_lang(lang_name: String) -> Result<Snippets, Error> {
+    pub fn get_lang(lang_name: String, project_root: &PathBuf) -> Result<Snippets, Error> {
         let file_name = format!("{}.json", lang_name.clone().to_lowercase());
-        let lang_file_path = config_dir(Dirs::Snippets).join(file_name);
-        let lang = parse::<Snippets>(&lang_file_path, lang_name)?;
+        let snippets_file_path = config_dir(Dirs::Snippets).join(file_name);
+        let snippets = parse::<Snippets>(&snippets_file_path, lang_name)?;
 
         // TODO: project
 
-        Ok(lang)
+        Ok(snippets)
     }
 
     /// 合并 snippets
@@ -161,7 +169,8 @@ mod test {
 
     #[test]
     fn test_get_lang() {
-        let lang = Snippets::get_lang("markdown".to_owned());
+        let root = std::env::current_dir().ok().unwrap();
+        let lang = Snippets::get_lang("markdown".to_owned(), &root);
 
         // eprintln!("{lang:?}");
         match lang {

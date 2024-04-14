@@ -1,14 +1,16 @@
 // dev
 #![allow(dead_code, unused_imports)]
 
-use std::collections::HashMap;
+use std::{collections::HashMap, path::PathBuf, str::FromStr};
 
+use action::Actions;
 use flexi_logger::{FileSpec, Logger, WriteMode};
 use lsp_server::Connection;
 use lsp_types::{
     notification::{DidCloseTextDocument, DidOpenTextDocument, Notification},
-    request::{CodeActionRequest, Completion, Request},
-    CodeAction, InitializeParams, ServerCapabilities,
+    request::{CodeActionRequest, CodeActionResolveRequest, Completion, Request},
+    CodeAction, CodeActionOptions, CodeActionProviderCapability, CodeActionResponse,
+    CompletionOptions, InitializeParams, Position, ServerCapabilities,
 };
 
 mod action;
@@ -20,6 +22,7 @@ mod snippet;
 mod variables;
 
 use errors::Error;
+use ropey::Rope;
 use snippet::Snippets;
 
 fn main() -> Result<(), Error> {
@@ -47,7 +50,12 @@ fn run_lsp_server() -> Result<(), Error> {
     let (connection, io_threads) = Connection::stdio();
 
     let server_capabilities = serde_json::to_value(&ServerCapabilities {
-        completion_provider: Some(lsp_types::CompletionOptions::default()),
+        completion_provider: Some(CompletionOptions::default()),
+        code_action_provider: Some(CodeActionProviderCapability::Options(CodeActionOptions {
+            resolve_provider: Some(true),
+            ..Default::default()
+        })),
+
         ..Default::default()
     })
     .expect("Must be serializable");
@@ -74,22 +82,24 @@ fn run_lsp_server() -> Result<(), Error> {
 }
 
 pub struct Server {
-    // root: PathBuf,
+    root: PathBuf,
     // config: Config
-    lang_states: HashMap<String, String>,
+    lang_states: HashMap<String, (String, Rope)>,
     // snippets
     params: InitializeParams,
 }
 
 impl Server {
     fn new(params: &InitializeParams) -> Self {
-        // get workpath
-        // let project_path = params.root_uri.unwrap().clone();
-
-        // params.initialization_options.unwrap().get("path")
+        let root = if let Some(ws) = params.workspace_folders.clone() {
+            let p = ws.first().unwrap().uri.path();
+            PathBuf::from_str(p).unwrap()
+        } else {
+            std::env::current_dir().ok().unwrap()
+        };
 
         Server {
-            // root: PathBuf::from(project_path.path()),
+            root,
             lang_states: HashMap::new(),
             params: params.clone(),
         }
@@ -99,13 +109,12 @@ impl Server {
         log::info!("starting example main loop");
 
         while let Ok(msg) = connection.receiver.recv() {
-            log::trace!("Message: {:#?}", msg);
-
             match msg {
                 lsp_server::Message::Request(request) => {
                     if connection.handle_shutdown(&request)? {
                         return Ok(());
                     }
+
                     let response = self.handle_request(request)?;
 
                     connection
@@ -135,10 +144,7 @@ impl Server {
             // 代码片段补全处理
             Completion::METHOD => {
                 let params = cast_request::<Completion>(request).expect("cast Completion");
-                log::trace!("Get Completion: {params:?}");
-
                 let completions = self.completion(params);
-                log::trace!("Res Completion: {completions:?}");
 
                 Ok(lsp_server::Response {
                     id,
@@ -151,9 +157,19 @@ impl Server {
             CodeActionRequest::METHOD => {
                 let params =
                     cast_request::<CodeActionRequest>(request).expect("cast code action request");
+                let actions = self.actions(params);
 
-                // TODO action for tmux open window ...
-                let actions: Vec<CodeAction> = Vec::new();
+                Ok(lsp_server::Response {
+                    id,
+                    error: None,
+                    result: Some(serde_json::to_value(actions)?),
+                })
+            }
+
+            CodeActionResolveRequest::METHOD => {
+                let params = cast_request::<CodeActionResolveRequest>(request)
+                    .expect("cast code action request");
+                let actions = self.action_resolve(&params)?;
 
                 Ok(lsp_server::Response {
                     id,
@@ -182,10 +198,13 @@ impl Server {
             DidOpenTextDocument::METHOD => {
                 let params = cast_notification::<DidOpenTextDocument>(notification)?;
 
-                // 记录打开文件所对应的文件语言ID
+                // ropey
+                let txt = Rope::from(params.text_document.text);
+
+                // 记录打开文件所对应的文件语言ID, 内容
                 self.lang_states.insert(
                     params.text_document.uri.path().to_owned(),
-                    params.text_document.language_id,
+                    (params.text_document.language_id, txt),
                 );
 
                 Ok::<(), Error>(())
@@ -212,18 +231,13 @@ impl Server {
         &self,
         params: lsp_types::CompletionParams,
     ) -> Option<Vec<lsp_types::CompletionItem>> {
-        let lang_name = self
+        let (lang_id, _) = self
             .lang_states
             .get(params.text_document_position.text_document.uri.path())?;
 
-        // let mut lang = Lang::get_lang(lang_name.to_owned()).ok()?;
-        // if let Some(global) = Lang::get_global().ok() {
-        //     lang.extend(global);
-        // }
-
-        let lang = [
-            Snippets::get_lang(lang_name.to_owned()),
-            Snippets::get_global(),
+        let snippets = [
+            Snippets::get_lang(lang_id.clone(), &self.root),
+            Snippets::get_global(&self.root),
         ]
         .into_iter()
         .filter(|r| r.is_ok())
@@ -233,8 +247,30 @@ impl Server {
             lang
         });
 
-        let items = lang.to_completion_items();
-        Some(items)
+        let snippets = snippets.to_completion_items();
+        Some(snippets)
+    }
+
+    fn actions(&self, params: lsp_types::CodeActionParams) -> Option<Vec<lsp_types::CodeAction>> {
+        let (lang_id, file_content) = self.lang_states.get(params.text_document.uri.path())?;
+        // TODO: GET text, range
+        let actions = Actions::get_lang(lang_id.clone(), file_content, &self.root).ok()?;
+        let actions = actions.to_code_action_items();
+
+        Some(actions)
+    }
+
+    fn action_resolve(&self, action: &CodeAction) -> Result<CodeAction, Error> {
+        let cmd = action.clone().command.expect("unknow cmd");
+
+        action::shell_exec(cmd.command.as_str())?;
+
+        // 设置 title 和 tooltip
+        let mut resolved_action = action.clone();
+        resolved_action.kind = Some(lsp_types::CodeActionKind::EMPTY);
+        resolved_action.command = None;
+
+        Ok(resolved_action)
     }
 }
 
