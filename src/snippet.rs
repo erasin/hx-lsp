@@ -102,6 +102,7 @@ impl Snippets {
         ]
         .concat()
         .into_iter()
+        .rev()
         .map(|p| parse::<Snippets>(&p, p.file_stem().unwrap().to_string_lossy().into_owned()).ok())
         .filter(|l| l.is_some())
         .map(|l| l.unwrap().snippets)
@@ -131,6 +132,7 @@ impl Snippets {
             config_dir(Dirs::Snippets).join(&file_name),
         ]
         .into_iter()
+        .rev()
         .filter(|p| p.exists())
         .map(|p| parse::<Snippets>(&p, lang_name.to_owned()))
         .filter(|l| l.is_ok())

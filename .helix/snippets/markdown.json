@@ -1,8 +1,8 @@
 {
   "markdown a": {
     "prefix": "mda",
-    "body": "mda: ${1:abc} : ${2:cde}",
-    "description": "test a info content"
+    "body": "mda in .helix: ${1:abc} : ${2:cde}",
+    "description": "test a info content in .helix"
   },
   "markdown b": {
     "prefix": [

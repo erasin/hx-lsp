@@ -111,6 +111,7 @@ impl Actions {
             config_dir(Dirs::Actions).join(&file_name),
         ]
         .into_iter()
+        .rev()
         .filter(|p| p.exists())
         .map(|p| parse::<Actions>(&p, lang_name.to_owned()))
         .filter(|l| l.is_ok())

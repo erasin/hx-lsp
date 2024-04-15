@@ -1,5 +1,5 @@
 {
-  "tmux split window project": {
+  "tmux split window": {
     "title": "tmux split window in project",
     "catch": [
       "#[test]",
