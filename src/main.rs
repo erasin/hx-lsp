@@ -254,7 +254,9 @@ impl Server {
     fn actions(&self, params: lsp_types::CodeActionParams) -> Option<Vec<lsp_types::CodeAction>> {
         let (lang_id, file_content) = self.lang_states.get(params.text_document.uri.path())?;
         // TODO: GET text, range
-        let actions = Actions::get_lang(lang_id.clone(), file_content, &self.root).ok()?;
+
+        let actions =
+            Actions::get_lang(lang_id.clone(), file_content, &params.range, &self.root).ok()?;
         let actions = actions.to_code_action_items();
 
         Some(actions)

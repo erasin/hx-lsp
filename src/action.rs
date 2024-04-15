@@ -4,7 +4,7 @@ use std::{
     process::{Command, Stdio},
 };
 
-use lsp_types::{CodeAction, WorkspaceEdit};
+use lsp_types::{CodeAction, Range, WorkspaceEdit};
 use ropey::Rope;
 use serde::{Deserialize, Serialize};
 
@@ -99,15 +99,36 @@ impl Actions {
     pub fn get_lang(
         lang_name: String,
         file_content: &Rope,
+        file_range: &Range,
         project_root: &PathBuf,
     ) -> Result<Actions, Error> {
         let file_name = format!("{}.json", lang_name.clone().to_lowercase());
-        let actions_file_path = config_dir(Dirs::Actions).join(file_name);
-        let actions = parse::<Actions>(&actions_file_path, lang_name)?;
-
-        // TODO: project
+        let actions = [
+            project_root
+                .join(".helix")
+                .join(Dirs::Actions.to_string())
+                .join(&file_name),
+            config_dir(Dirs::Actions).join(&file_name),
+        ]
+        .into_iter()
+        .filter(|p| p.exists())
+        .map(|p| parse::<Actions>(&p, lang_name.to_owned()))
+        .filter(|l| l.is_ok())
+        .map(|l| l.unwrap())
+        .fold(
+            Actions::new(lang_name.to_owned(), HashMap::new()),
+            |mut acc, map| {
+                acc.extend(map);
+                acc
+            },
+        );
 
         Ok(actions)
+    }
+
+    /// 合并 actions
+    pub fn extend(&mut self, other: Actions) {
+        self.actions.extend(other.actions);
     }
 
     pub fn to_code_action_items(&self) -> Vec<CodeAction> {

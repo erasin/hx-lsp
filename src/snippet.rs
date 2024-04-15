@@ -96,19 +96,19 @@ impl Snippets {
     ///
     /// This function will return an error if .
     pub fn get_global(project_root: &PathBuf) -> Result<Snippets, Error> {
-        let global_all: HashMap<String, Snippet> = read_names(&config_dir(Dirs::Snippets))
-            .into_iter()
-            .map(|p| {
-                parse::<Snippets>(&p, p.file_stem().unwrap().to_string_lossy().into_owned()).ok()
-            })
-            .filter(|l| l.is_some())
-            .map(|l| l.unwrap().snippets)
-            .fold(HashMap::new(), |mut acc, map| {
-                acc.extend(map);
-                acc
-            });
-
-        // TODO: project
+        let global_all: HashMap<String, Snippet> = [
+            read_names(&project_root.join(".helix").join(Dirs::Snippets.to_string())),
+            read_names(&config_dir(Dirs::Snippets)),
+        ]
+        .concat()
+        .into_iter()
+        .map(|p| parse::<Snippets>(&p, p.file_stem().unwrap().to_string_lossy().into_owned()).ok())
+        .filter(|l| l.is_some())
+        .map(|l| l.unwrap().snippets)
+        .fold(HashMap::new(), |mut acc, map| {
+            acc.extend(map);
+            acc
+        });
 
         if global_all.is_empty() {
             Err(Error::NotFound("Global Snippets".to_owned()))
@@ -123,10 +123,25 @@ impl Snippets {
     /// 获取 XDG_CONFIG_HOME 下的 `langid.json` 语言文件
     pub fn get_lang(lang_name: String, project_root: &PathBuf) -> Result<Snippets, Error> {
         let file_name = format!("{}.json", lang_name.clone().to_lowercase());
-        let snippets_file_path = config_dir(Dirs::Snippets).join(file_name);
-        let snippets = parse::<Snippets>(&snippets_file_path, lang_name)?;
-
-        // TODO: project
+        let snippets = [
+            project_root
+                .join(".helix")
+                .join(Dirs::Snippets.to_string())
+                .join(&file_name),
+            config_dir(Dirs::Snippets).join(&file_name),
+        ]
+        .into_iter()
+        .filter(|p| p.exists())
+        .map(|p| parse::<Snippets>(&p, lang_name.to_owned()))
+        .filter(|l| l.is_ok())
+        .map(|l| l.unwrap())
+        .fold(
+            Snippets::new(lang_name.to_owned(), HashMap::new()),
+            |mut acc, map| {
+                acc.extend(map);
+                acc
+            },
+        );
 
         Ok(snippets)
     }

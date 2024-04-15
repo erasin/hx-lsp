@@ -1,14 +1,14 @@
 {
   "tmux split window project": {
-    "title": "tmux split window project",
+    "title": "tmux split window in project",
     "catch": [
       "#[test]",
       "^test_"
     ],
     "shell": [
       "tmux split-window -h",
-      "tmux send hx Enter"
+      "tmux send project"
     ],
-    "description": "tmux split and open helix"
+    "description": "tmux split and open helix in project"
   }
 }

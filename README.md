@@ -2,13 +2,40 @@
 
 [![中文文档](https://img.shields.io/badge/lang-zh_CN-red.svg)](./README.zh-cn.md)
 
-## install 
+## 功能
+
+- Completion: snippets
+- CodeAction: actions
+
+
+## 安装
 
 ```sh
 git clone https://github.com/erasin/hx-lsp.git
 cd hx-lsp
 cargo install --path .
 ```
+
+## LSP 参数
+
+
+
+## 配置文件
+
+文件加载路径
+
+- [x] `$XDG_CONFIG_HOME/Editor/snippets/`
+- [ ] `WORKSPACE_ROOT/.helix/snippets/`
+
+
+
+## Completion: snippets
+
+
+## CodeAction: actions
+
+
+
 
 修改 helix 配置文件 `$XDG_CONFIG_HOME/helix/languages.toml` 或者 项目目录下 `.helix/languages.toml`， 根据对应的语言追加 `language-servers` 配置。
 
@@ -42,7 +69,6 @@ snippet 文件加载路径顺序为：
 - 全局文件，比如 global.code-snippets
 
 
-## Actions 自定义
 
 
 
