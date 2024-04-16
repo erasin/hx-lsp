@@ -32,7 +32,7 @@ use errors::Error;
 use ropey::{Rope, RopeSlice};
 use snippet::Snippets;
 
-use crate::encoding::OffsetEncoding;
+use crate::encoding::{lsp_pos_to_pos, OffsetEncoding};
 
 fn main() -> Result<(), Error> {
     if let Some(arg) = std::env::args().nth(1) {
@@ -240,8 +240,8 @@ impl Server {
                 let uri = params.text_document.uri.path();
 
                 // 移除记录的文件状态
-                self.lang_id.remove(uri.clone());
-                self.lang_doc.lock().remove(uri.clone());
+                self.lang_id.remove(uri);
+                self.lang_doc.lock().remove(uri);
 
                 Ok(())
             }
@@ -253,7 +253,7 @@ impl Server {
                 let uri = params.text_document.uri.path();
 
                 let mut doc_lock = self.lang_doc.lock();
-                let mut doc = doc_lock.get_mut(uri.clone()).expect("undefind file path.");
+                let mut doc = doc_lock.get_mut(uri).expect("undefind file path.");
 
                 // Option: change: Some(TextDocumentSyncKind::FULL),
                 // *doc = Rope::from(params.content_changes.last().unwrap().text.clone());
@@ -262,7 +262,7 @@ impl Server {
 
                 // 增量更新
                 params.content_changes.into_iter().for_each(|change| {
-                    self.apply_content_change(&mut doc, &change, OffsetEncoding::Utf8);
+                    let _ = self.apply_content_change(&mut doc, &change, OffsetEncoding::Utf8);
                 });
                 Ok(())
             }
@@ -278,7 +278,7 @@ impl Server {
                 let uri = params.text_document.uri.path();
 
                 let mut doc_lock = self.lang_doc.lock();
-                let doc = doc_lock.get_mut(uri.clone()).expect("undefind file path.");
+                let doc = doc_lock.get_mut(uri).expect("undefind file path.");
 
                 // let mut doc = self
                 //     .lang_doc
@@ -355,6 +355,7 @@ impl Server {
         change: &TextDocumentContentChangeEvent,
         offset_encoding: OffsetEncoding,
     ) -> Result<(), Error> {
+        // https://gist.github.com/rojas-diego/04d9c4e3fff5f8374f29b9b738d541ef
         match change.range {
             Some(range) => {
                 assert!(
@@ -365,9 +366,6 @@ impl Server {
 
                 let same_line = range.start.line == range.end.line;
                 let same_character = range.start.character == range.end.character;
-
-                let change_start_line_cu_idx = range.start.character as usize;
-                let change_end_line_cu_idx = range.end.character as usize;
 
                 // 1. Get the line at which the change starts.
                 let change_start_line_idx = range.start.line as usize;
@@ -399,7 +397,7 @@ impl Server {
                     },
                 };
 
-                fn compute_char_idx(
+                fn lsp_pos_to_pos(
                     position_encoding: OffsetEncoding,
                     position: &Position,
                     slice: &RopeSlice,
@@ -417,10 +415,10 @@ impl Server {
                 // 3. Compute the character offset into the start/end line where
                 // the change starts/ends.
                 let change_start_line_char_idx =
-                    compute_char_idx(offset_encoding, &range.start, &change_start_line)?;
+                    lsp_pos_to_pos(offset_encoding, &range.start, &change_start_line).unwrap();
                 let change_end_line_char_idx = match same_line && same_character {
                     true => change_start_line_char_idx,
-                    false => compute_char_idx(offset_encoding, &range.end, &change_end_line)?,
+                    false => lsp_pos_to_pos(offset_encoding, &range.end, &change_end_line).unwrap(),
                 };
 
                 // 4. Compute the character and byte offset into the document
@@ -431,36 +429,9 @@ impl Server {
                     true => change_start_doc_char_idx,
                     false => doc.line_to_char(change_end_line_idx) + change_end_line_char_idx,
                 };
-                let change_start_doc_byte_idx = doc.char_to_byte(change_start_doc_char_idx);
-                let change_end_doc_byte_idx = match same_line && same_character {
-                    true => change_start_doc_byte_idx,
-                    false => doc.char_to_byte(change_end_doc_char_idx),
-                };
-
-                // 5. Compute the byte offset into the start/end line where the
-                // change starts/ends. Required for tree-sitter.
-                let change_start_line_byte_idx = match offset_encoding {
-                    OffsetEncoding::Utf8 => change_start_line_cu_idx,
-                    OffsetEncoding::Utf16 => {
-                        change_start_line.char_to_utf16_cu(change_start_line_char_idx)
-                    }
-                    OffsetEncoding::Utf32 => change_start_line_char_idx,
-                };
-                let change_end_line_byte_idx = match same_line && same_character {
-                    true => change_start_line_byte_idx,
-                    false => match offset_encoding {
-                        OffsetEncoding::Utf8 => change_end_line_cu_idx,
-                        OffsetEncoding::Utf16 => {
-                            change_end_line.char_to_utf16_cu(change_end_line_char_idx)
-                        }
-                        OffsetEncoding::Utf32 => change_end_line_char_idx,
-                    },
-                };
 
                 doc.remove(change_start_doc_char_idx..change_end_doc_char_idx);
                 doc.insert(change_start_doc_char_idx, &change.text);
-
-                log::debug!("---->>>: {:?}", doc);
 
                 return Ok(());
             }
