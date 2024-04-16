@@ -1,7 +1,7 @@
 // dev
 #![allow(dead_code, unused_imports)]
 
-use std::{collections::HashMap, path::PathBuf, str::FromStr};
+use std::{collections::HashMap, path::PathBuf, str::FromStr, sync::Arc};
 
 use action::Actions;
 use flexi_logger::{FileSpec, Logger, WriteMode};
@@ -13,10 +13,14 @@ use lsp_types::{
     },
     request::{CodeActionRequest, CodeActionResolveRequest, Completion, Request},
     CodeAction, CodeActionOptions, CodeActionProviderCapability, CodeActionResponse,
-    CompletionOptions, InitializeParams, Position, ServerCapabilities,
+    CompletionOptions, InitializeParams, Position, PositionEncodingKind, SaveOptions,
+    ServerCapabilities, TextDocumentContentChangeEvent, TextDocumentSyncCapability,
+    TextDocumentSyncKind, TextDocumentSyncOptions, TextDocumentSyncSaveOptions,
 };
+use parking_lot::Mutex;
 
 mod action;
+mod encoding;
 mod errors;
 mod fuzzy;
 mod loader;
@@ -25,8 +29,10 @@ mod snippet;
 mod variables;
 
 use errors::Error;
-use ropey::Rope;
+use ropey::{Rope, RopeSlice};
 use snippet::Snippets;
+
+use crate::encoding::OffsetEncoding;
 
 fn main() -> Result<(), Error> {
     if let Some(arg) = std::env::args().nth(1) {
@@ -58,7 +64,18 @@ fn run_lsp_server() -> Result<(), Error> {
             resolve_provider: Some(true),
             ..Default::default()
         })),
-
+        text_document_sync: Some(TextDocumentSyncCapability::Options(
+            TextDocumentSyncOptions {
+                open_close: Some(true),
+                // change: Some(TextDocumentSyncKind::FULL),
+                change: Some(TextDocumentSyncKind::INCREMENTAL),
+                will_save: Some(true),
+                will_save_wait_until: Some(true),
+                save: Some(TextDocumentSyncSaveOptions::SaveOptions(SaveOptions {
+                    include_text: Some(true),
+                })),
+            },
+        )),
         ..Default::default()
     })
     .expect("Must be serializable");
@@ -87,7 +104,8 @@ fn run_lsp_server() -> Result<(), Error> {
 pub struct Server {
     root: PathBuf,
     // config: Config
-    lang_states: HashMap<String, (String, Rope)>,
+    lang_id: HashMap<String, String>,
+    lang_doc: Arc<Mutex<HashMap<String, Rope>>>,
     // snippets
     params: InitializeParams,
 }
@@ -103,7 +121,8 @@ impl Server {
 
         Server {
             root,
-            lang_states: HashMap::new(),
+            lang_id: HashMap::new(),
+            lang_doc: Arc::new(Mutex::new(HashMap::new())),
             params: params.clone(),
         }
     }
@@ -201,15 +220,15 @@ impl Server {
             DidOpenTextDocument::METHOD => {
                 let params = cast_notification::<DidOpenTextDocument>(notification)?;
                 log::debug!("OpenFile: {params:?}");
+                let uri = params.text_document.uri.path().to_string();
 
                 // ropey
-                let txt = Rope::from(params.text_document.text);
+                let doc = Rope::from(params.text_document.text);
 
                 // 记录打开文件所对应的文件语言ID, 内容
-                self.lang_states.insert(
-                    params.text_document.uri.path().to_owned(),
-                    (params.text_document.language_id, txt),
-                );
+                self.lang_id
+                    .insert(uri.clone(), params.text_document.language_id);
+                self.lang_doc.lock().insert(uri.clone(), doc);
 
                 Ok::<(), Error>(())
             }
@@ -218,9 +237,11 @@ impl Server {
             DidCloseTextDocument::METHOD => {
                 let params = cast_notification::<DidCloseTextDocument>(notification)?;
                 log::debug!("CloseFile: {params:?}");
+                let uri = params.text_document.uri.path();
 
                 // 移除记录的文件状态
-                self.lang_states.remove(params.text_document.uri.path());
+                self.lang_id.remove(uri.clone());
+                self.lang_doc.lock().remove(uri.clone());
 
                 Ok(())
             }
@@ -229,35 +250,43 @@ impl Server {
             DidChangeTextDocument::METHOD => {
                 let params = cast_notification::<DidChangeTextDocument>(notification)?;
                 log::debug!("ChangeText: {params:?}");
+                let uri = params.text_document.uri.path();
 
-                // TODO FIX fail
-                if let Some(file) = self
-                    .lang_states
-                    .get_mut(&params.text_document.uri.path().to_owned())
-                {
-                    file.1 = Rope::from(params.content_changes.last().unwrap().text.clone());
-                }
+                let mut doc_lock = self.lang_doc.lock();
+                let mut doc = doc_lock.get_mut(uri.clone()).expect("undefind file path.");
 
+                // Option: change: Some(TextDocumentSyncKind::FULL),
+                // *doc = Rope::from(params.content_changes.last().unwrap().text.clone());
+
+                // 处理文本变更
+
+                // 增量更新
+                params.content_changes.into_iter().for_each(|change| {
+                    self.apply_content_change(&mut doc, &change, OffsetEncoding::Utf8);
+                });
                 Ok(())
             }
-            DidChangeWatchedFiles::METHOD => {
-                let params = cast_notification::<DidChangeWatchedFiles>(notification)?;
-                log::debug!("WatchFile: {params:?}");
 
-                Ok(())
-            }
-
+            // DidChangeWatchedFiles::METHOD => {
+            //     let params = cast_notification::<DidChangeWatchedFiles>(notification)?;
+            //     log::debug!("WatchFile: {params:?}");
+            //     Ok(())
+            // }
             DidSaveTextDocument::METHOD => {
                 let params = cast_notification::<DidSaveTextDocument>(notification)?;
                 log::debug!("SaveFile: {params:?}");
+                let uri = params.text_document.uri.path();
 
-                // TODO FIX fail
-                if let Some(file) = self
-                    .lang_states
-                    .get_mut(&params.text_document.uri.path().to_owned())
-                {
-                    file.1 = Rope::from(params.text.unwrap());
-                }
+                let mut doc_lock = self.lang_doc.lock();
+                let doc = doc_lock.get_mut(uri.clone()).expect("undefind file path.");
+
+                // let mut doc = self
+                //     .lang_doc
+                //     .lock()
+                //     .get_mut(uri.clone())
+                //     .expect("undefind file path.");
+
+                *doc = Rope::from(params.text.unwrap());
 
                 Ok(())
             }
@@ -273,9 +302,9 @@ impl Server {
         &self,
         params: lsp_types::CompletionParams,
     ) -> Option<Vec<lsp_types::CompletionItem>> {
-        let (lang_id, _) = self
-            .lang_states
-            .get(params.text_document_position.text_document.uri.path())?;
+        let uri = params.text_document_position.text_document.uri.path();
+
+        let lang_id = self.lang_id.get(uri)?;
 
         let snippets = [
             Snippets::get_lang(lang_id.clone(), &self.root),
@@ -294,11 +323,14 @@ impl Server {
     }
 
     fn actions(&self, params: lsp_types::CodeActionParams) -> Option<Vec<lsp_types::CodeAction>> {
-        let (lang_id, file_content) = self.lang_states.get(params.text_document.uri.path())?;
+        let uri = params.text_document.uri.path();
+        let lang_id = self.lang_id.get(uri)?;
+        let doc_lock = self.lang_doc.lock();
+        let doc = doc_lock.get(uri)?;
+
         // TODO: GET text, range
 
-        let actions =
-            Actions::get_lang(lang_id.clone(), file_content, &params.range, &self.root).ok()?;
+        let actions = Actions::get_lang(lang_id.clone(), doc, &params.range, &self.root).ok()?;
         let actions = actions.to_code_action_items();
 
         Some(actions)
@@ -315,6 +347,129 @@ impl Server {
         resolved_action.command = None;
 
         Ok(resolved_action)
+    }
+
+    pub fn apply_content_change(
+        &self,
+        doc: &mut Rope,
+        change: &TextDocumentContentChangeEvent,
+        offset_encoding: OffsetEncoding,
+    ) -> Result<(), Error> {
+        match change.range {
+            Some(range) => {
+                assert!(
+                    range.start.line < range.end.line
+                        || (range.start.line == range.end.line
+                            && range.start.character <= range.end.character)
+                );
+
+                let same_line = range.start.line == range.end.line;
+                let same_character = range.start.character == range.end.character;
+
+                let change_start_line_cu_idx = range.start.character as usize;
+                let change_end_line_cu_idx = range.end.character as usize;
+
+                // 1. Get the line at which the change starts.
+                let change_start_line_idx = range.start.line as usize;
+                let change_start_line = match doc.get_line(change_start_line_idx) {
+                    Some(line) => line,
+                    None => {
+                        return Err(Error::PositionOutOfBounds(
+                            range.start.line,
+                            range.start.character,
+                        ))
+                    }
+                };
+
+                // 2. Get the line at which the change ends. (Small optimization
+                // where we first check whether start and end line are the
+                // same O(log N) lookup. We repeat this all throughout this
+                // function).
+                let change_end_line_idx = range.end.line as usize;
+                let change_end_line = match same_line {
+                    true => change_start_line,
+                    false => match doc.get_line(change_end_line_idx) {
+                        Some(line) => line,
+                        None => {
+                            return Err(Error::PositionOutOfBounds(
+                                range.end.line,
+                                range.end.character,
+                            ));
+                        }
+                    },
+                };
+
+                fn compute_char_idx(
+                    position_encoding: OffsetEncoding,
+                    position: &Position,
+                    slice: &RopeSlice,
+                ) -> Result<usize, Error> {
+                    match position_encoding {
+                        OffsetEncoding::Utf8 => slice.try_byte_to_char(position.character as usize),
+                        OffsetEncoding::Utf16 => {
+                            slice.try_utf16_cu_to_char(position.character as usize)
+                        }
+                        OffsetEncoding::Utf32 => Ok(position.character as usize),
+                    }
+                    .map_err(|_| Error::PositionOutOfBounds(position.line, position.character))
+                }
+
+                // 3. Compute the character offset into the start/end line where
+                // the change starts/ends.
+                let change_start_line_char_idx =
+                    compute_char_idx(offset_encoding, &range.start, &change_start_line)?;
+                let change_end_line_char_idx = match same_line && same_character {
+                    true => change_start_line_char_idx,
+                    false => compute_char_idx(offset_encoding, &range.end, &change_end_line)?,
+                };
+
+                // 4. Compute the character and byte offset into the document
+                // where the change starts/ends.
+                let change_start_doc_char_idx =
+                    doc.line_to_char(change_start_line_idx) + change_start_line_char_idx;
+                let change_end_doc_char_idx = match same_line && same_character {
+                    true => change_start_doc_char_idx,
+                    false => doc.line_to_char(change_end_line_idx) + change_end_line_char_idx,
+                };
+                let change_start_doc_byte_idx = doc.char_to_byte(change_start_doc_char_idx);
+                let change_end_doc_byte_idx = match same_line && same_character {
+                    true => change_start_doc_byte_idx,
+                    false => doc.char_to_byte(change_end_doc_char_idx),
+                };
+
+                // 5. Compute the byte offset into the start/end line where the
+                // change starts/ends. Required for tree-sitter.
+                let change_start_line_byte_idx = match offset_encoding {
+                    OffsetEncoding::Utf8 => change_start_line_cu_idx,
+                    OffsetEncoding::Utf16 => {
+                        change_start_line.char_to_utf16_cu(change_start_line_char_idx)
+                    }
+                    OffsetEncoding::Utf32 => change_start_line_char_idx,
+                };
+                let change_end_line_byte_idx = match same_line && same_character {
+                    true => change_start_line_byte_idx,
+                    false => match offset_encoding {
+                        OffsetEncoding::Utf8 => change_end_line_cu_idx,
+                        OffsetEncoding::Utf16 => {
+                            change_end_line.char_to_utf16_cu(change_end_line_char_idx)
+                        }
+                        OffsetEncoding::Utf32 => change_end_line_char_idx,
+                    },
+                };
+
+                doc.remove(change_start_doc_char_idx..change_end_doc_char_idx);
+                doc.insert(change_start_doc_char_idx, &change.text);
+
+                log::debug!("---->>>: {:?}", doc);
+
+                return Ok(());
+            }
+            None => {
+                *doc = Rope::from_str(&change.text);
+
+                return Ok(());
+            }
+        }
     }
 }
 

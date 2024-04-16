@@ -43,6 +43,9 @@ pub enum Error {
     #[diagnostic(code(lsp::log))]
     Logger(#[from] flexi_logger::FlexiLoggerError),
 
+    #[error("position {0}:{1} is out of bounds")]
+    PositionOutOfBounds(u32, u32),
+
     #[error("Not Found: {0}")]
     NotFound(String),
     // #[error("unknown data store error")]
