@@ -4,7 +4,9 @@ use std::{
     process::{Command, Stdio},
 };
 
-use lsp_types::{CodeAction, Range, WorkspaceEdit};
+use lsp_types::{CodeAction, FileChangeType, Range, WorkspaceEdit};
+use once_cell::sync::Lazy;
+use regex::Regex;
 use ropey::Rope;
 use serde::{Deserialize, Serialize};
 
@@ -18,7 +20,7 @@ use crate::{
 pub struct Action {
     /// 捕捉, 支持单行或者两行
     title: String,
-    catch: StrOrSeq,
+    catch: String,
     shell: StrOrSeq, // string
     description: Option<String>,
 }
@@ -26,9 +28,9 @@ pub struct Action {
 impl Action {
     /// 转换 lsp 格式
     fn to_code_action_item(&self) -> Option<CodeAction> {
-        if self.catch.first().is_none() {
-            return None;
-        }
+        // if self.catch.is_empty() {
+        //     return None;
+        // }
 
         let command = lsp_types::Command {
             title: "Run Test".to_string(),
@@ -103,7 +105,7 @@ impl Actions {
         project_root: &PathBuf,
     ) -> Result<Actions, Error> {
         let file_name = format!("{}.json", lang_name.clone().to_lowercase());
-        let actions = [
+        let mut actions = [
             project_root
                 .join(".helix")
                 .join(Dirs::Actions.to_string())
@@ -113,9 +115,7 @@ impl Actions {
         .into_iter()
         .rev()
         .filter(|p| p.exists())
-        .map(|p| parse::<Actions>(&p, lang_name.to_owned()))
-        .filter(|l| l.is_ok())
-        .map(|l| l.unwrap())
+        .filter_map(|p| parse::<Actions>(&p, lang_name.to_owned()).ok())
         .fold(
             Actions::new(lang_name.to_owned(), HashMap::new()),
             |mut acc, map| {
@@ -123,6 +123,8 @@ impl Actions {
                 acc
             },
         );
+
+        actions.fliter(file_content, file_range);
 
         Ok(actions)
     }
@@ -135,10 +137,43 @@ impl Actions {
     pub fn to_code_action_items(&self) -> Vec<CodeAction> {
         self.actions
             .iter()
-            .map(|(_name, action)| action.to_code_action_item())
-            .filter(|s| s.is_some())
-            .map(|s| s.unwrap())
+            .filter_map(|(_name, action)| action.to_code_action_item())
             .collect()
+    }
+
+    pub fn fliter(&mut self, file_content: &Rope, file_range: &Range) {
+        let line = file_content.line(file_range.start.line as usize);
+
+        let actions = self
+            .actions
+            .clone()
+            .into_iter()
+            .filter_map(|(name, action)| {
+                if action.catch.is_empty() {
+                    return Some((name, action));
+                }
+
+                log::trace!("{action:?}");
+
+                let re = Regex::new(&action.catch);
+                if re.is_ok() {
+                    let re = re.unwrap();
+                    if re.is_match(&line.to_string()) {
+                        return Some((name, action));
+                    }
+                    // if let (captures) = re.captures(&line.to_string()){
+                    //    if let Some(capture) = captures.get(1) {
+                    //     let mut a = action.clone();
+                    //     a
+                    //     Some(a)
+
+                    // };
+                }
+                None
+            })
+            .collect();
+
+        self.actions = actions;
     }
 }
 

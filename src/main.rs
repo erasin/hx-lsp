@@ -7,7 +7,10 @@ use action::Actions;
 use flexi_logger::{FileSpec, Logger, WriteMode};
 use lsp_server::Connection;
 use lsp_types::{
-    notification::{DidCloseTextDocument, DidOpenTextDocument, Notification},
+    notification::{
+        DidChangeTextDocument, DidChangeWatchedFiles, DidCloseTextDocument, DidOpenTextDocument,
+        DidSaveTextDocument, Notification,
+    },
     request::{CodeActionRequest, CodeActionResolveRequest, Completion, Request},
     CodeAction, CodeActionOptions, CodeActionProviderCapability, CodeActionResponse,
     CompletionOptions, InitializeParams, Position, ServerCapabilities,
@@ -197,6 +200,7 @@ impl Server {
             // 打开文件
             DidOpenTextDocument::METHOD => {
                 let params = cast_notification::<DidOpenTextDocument>(notification)?;
+                log::debug!("OpenFile: {params:?}");
 
                 // ropey
                 let txt = Rope::from(params.text_document.text);
@@ -213,9 +217,47 @@ impl Server {
             // 文件关闭
             DidCloseTextDocument::METHOD => {
                 let params = cast_notification::<DidCloseTextDocument>(notification)?;
+                log::debug!("CloseFile: {params:?}");
 
                 // 移除记录的文件状态
                 self.lang_states.remove(params.text_document.uri.path());
+
+                Ok(())
+            }
+
+            // didchange
+            DidChangeTextDocument::METHOD => {
+                let params = cast_notification::<DidChangeTextDocument>(notification)?;
+                log::debug!("ChangeText: {params:?}");
+
+                // TODO FIX fail
+                if let Some(file) = self
+                    .lang_states
+                    .get_mut(&params.text_document.uri.path().to_owned())
+                {
+                    file.1 = Rope::from(params.content_changes.last().unwrap().text.clone());
+                }
+
+                Ok(())
+            }
+            DidChangeWatchedFiles::METHOD => {
+                let params = cast_notification::<DidChangeWatchedFiles>(notification)?;
+                log::debug!("WatchFile: {params:?}");
+
+                Ok(())
+            }
+
+            DidSaveTextDocument::METHOD => {
+                let params = cast_notification::<DidSaveTextDocument>(notification)?;
+                log::debug!("SaveFile: {params:?}");
+
+                // TODO FIX fail
+                if let Some(file) = self
+                    .lang_states
+                    .get_mut(&params.text_document.uri.path().to_owned())
+                {
+                    file.1 = Rope::from(params.text.unwrap());
+                }
 
                 Ok(())
             }

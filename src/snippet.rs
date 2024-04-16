@@ -103,9 +103,10 @@ impl Snippets {
         .concat()
         .into_iter()
         .rev()
-        .map(|p| parse::<Snippets>(&p, p.file_stem().unwrap().to_string_lossy().into_owned()).ok())
-        .filter(|l| l.is_some())
-        .map(|l| l.unwrap().snippets)
+        .filter_map(|p| {
+            parse::<Snippets>(&p, p.file_stem().unwrap().to_string_lossy().into_owned()).ok()
+        })
+        .map(|l| l.snippets)
         .fold(HashMap::new(), |mut acc, map| {
             acc.extend(map);
             acc
@@ -134,9 +135,7 @@ impl Snippets {
         .into_iter()
         .rev()
         .filter(|p| p.exists())
-        .map(|p| parse::<Snippets>(&p, lang_name.to_owned()))
-        .filter(|l| l.is_ok())
-        .map(|l| l.unwrap())
+        .filter_map(|p| parse::<Snippets>(&p, lang_name.to_owned()).ok())
         .fold(
             Snippets::new(lang_name.to_owned(), HashMap::new()),
             |mut acc, map| {
@@ -157,9 +156,7 @@ impl Snippets {
     pub fn to_completion_items(&self) -> Vec<CompletionItem> {
         self.snippets
             .iter()
-            .map(|(_name, snippet)| snippet.to_completion_item())
-            .filter(|s| s.is_some())
-            .map(|s| s.unwrap())
+            .filter_map(|(_name, snippet)| snippet.to_completion_item())
             .collect()
     }
 }

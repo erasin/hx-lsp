@@ -2,11 +2,12 @@
 
 [![中文文档](https://img.shields.io/badge/lang-zh_CN-red.svg)](./README.zh-cn.md)
 
+一个提供了自定义代码片段 snippets 和 Code Action 的 lsp 工具。
+
 ## 功能
 
 - Completion: snippets
 - CodeAction: actions
-
 
 ## 安装
 
@@ -26,7 +27,6 @@ cargo install --path .
 
 - [x] `$XDG_CONFIG_HOME/Editor/snippets/`
 - [ ] `WORKSPACE_ROOT/.helix/snippets/`
-
 
 
 ## Completion: snippets

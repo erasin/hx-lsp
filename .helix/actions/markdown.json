@@ -1,10 +1,7 @@
 {
-  "tmux split window": {
+  "tmux split window helix": {
     "title": "tmux split window in project",
-    "catch": [
-      "#[test]",
-      "^test_"
-    ],
+    "catch": "fn",
     "shell": [
       "tmux split-window -h",
       "tmux send project"
