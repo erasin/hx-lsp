@@ -298,17 +298,19 @@ impl Server {
 
         let lang_id = self.lang_id.get(uri)?;
 
-        let snippets = [
-            Snippets::get_lang(lang_id.clone(), &self.root),
-            Snippets::get_global(&self.root),
-        ]
-        .into_iter()
-        .filter(|r| r.is_ok())
-        .map(move |r| r.unwrap())
-        .fold(Snippets::default(), |mut lang, other| {
-            lang.extend(other);
-            lang
-        });
+        let mut snippets = Snippets::get_lang(lang_id.clone(), &self.root);
+        snippets.extend(Snippets::get_global(&self.root));
+
+        // let snippets = [
+        //     Snippets::get_lang(lang_id.clone(), &self.root),
+        //     Snippets::get_global(&self.root),
+        // ]
+        // .into_iter()
+        // .filter_map(|r| r.ok())
+        // .fold(Snippets::default(), |mut lang, other| {
+        //     lang.extend(other);
+        //     lang
+        // });
 
         let snippets = snippets.to_completion_items();
         Some(snippets)
@@ -320,12 +322,9 @@ impl Server {
         let doc_lock = self.lang_doc.lock();
         let doc = doc_lock.get(uri)?;
 
-        // TODO: GET text, range
+        let actions = Actions::get_lang(lang_id.clone(), doc, &params.range, &self.root);
 
-        let actions = Actions::get_lang(lang_id.clone(), doc, &params.range, &self.root).ok()?;
-        let actions = actions.to_code_action_items();
-
-        Some(actions)
+        Some(actions.to_code_action_items())
     }
 
     fn action_resolve(&self, action: &CodeAction) -> Result<CodeAction, Error> {

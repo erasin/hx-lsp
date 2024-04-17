@@ -3,5 +3,10 @@
     "prefix": "globalb",
     "body": "global testb: ${1:abc} D: ${2:cde}",
     "description": "test a info content in global"
+  },
+  "global c": {
+    "prefix": "globalc",
+    "body": "global testc: ${1:abc} D: ${2:cde}",
+    "description": "test c info content in global"
   }
 }

@@ -97,3 +97,6 @@ pub fn apply_content_change(
         }
     }
 }
+
+// 获取变更时候最后的
+// fn input_last_word() {}

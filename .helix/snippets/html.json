@@ -1,0 +1,7 @@
+{
+	"html a": {
+		"prefix": "htmla",
+		"body": "<title>${1:abc} --- ${2:cde}</title>",
+		"description": "test a info content in .helix"
+	}
+}

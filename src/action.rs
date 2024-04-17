@@ -4,8 +4,9 @@ use std::{
     process::{Command, Stdio},
 };
 
-use lsp_types::{CodeAction, FileChangeType, Range, WorkspaceEdit};
+use lsp_types::{CodeAction, Range};
 use once_cell::sync::Lazy;
+use parking_lot::Mutex;
 use regex::Regex;
 use ropey::Rope;
 use serde::{Deserialize, Serialize};
@@ -63,6 +64,8 @@ impl Action {
     }
 }
 
+static ACTIONS: Lazy<Mutex<HashMap<String, Actions>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+
 /// 语言包
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct Actions {
@@ -103,30 +106,32 @@ impl Actions {
         file_content: &Rope,
         file_range: &Range,
         project_root: &PathBuf,
-    ) -> Result<Actions, Error> {
-        let file_name = format!("{}.json", lang_name.clone().to_lowercase());
-        let mut actions = [
-            project_root
-                .join(".helix")
-                .join(Dirs::Actions.to_string())
-                .join(&file_name),
-            config_dir(Dirs::Actions).join(&file_name),
-        ]
-        .into_iter()
-        .rev()
-        .filter(|p| p.exists())
-        .filter_map(|p| parse::<Actions>(&p, lang_name.to_owned()).ok())
-        .fold(
-            Actions::new(lang_name.to_owned(), HashMap::new()),
-            |mut acc, map| {
-                acc.extend(map);
-                acc
-            },
-        );
+    ) -> Actions {
+        let mut actions_list = ACTIONS.lock();
+
+        let mut actions = match actions_list.get(&lang_name) {
+            Some(has) => has.clone(),
+            None => {
+                let file_name = format!("{}.json", lang_name.clone().to_lowercase());
+                let lang_actions = from_files(
+                    lang_name.clone(),
+                    [
+                        project_root
+                            .join(".helix")
+                            .join(Dirs::Actions.to_string())
+                            .join(&file_name),
+                        config_dir(Dirs::Actions).join(&file_name),
+                    ]
+                    .to_vec(),
+                );
+
+                actions_list.insert(lang_name, lang_actions.clone());
+                lang_actions
+            }
+        };
 
         actions.fliter(file_content, file_range);
-
-        Ok(actions)
+        actions
     }
 
     /// 合并 actions
@@ -166,7 +171,6 @@ impl Actions {
                     //     let mut a = action.clone();
                     //     a
                     //     Some(a)
-
                     // };
                 }
                 None
@@ -175,6 +179,21 @@ impl Actions {
 
         self.actions = actions;
     }
+}
+
+fn from_files(name: String, files: Vec<PathBuf>) -> Actions {
+    files
+        .into_iter()
+        .rev()
+        .filter(|p| p.exists())
+        .filter_map(|p| parse::<Actions>(&p, name.to_owned()).ok())
+        .fold(
+            Actions::new(name.to_owned(), HashMap::new()),
+            |mut acc, map| {
+                acc.extend(map);
+                acc
+            },
+        )
 }
 
 /// 执行

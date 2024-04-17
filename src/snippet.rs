@@ -1,8 +1,9 @@
-use std::{collections::HashMap, fs::File, io::BufReader, path::PathBuf};
+use std::{collections::HashMap, path::PathBuf};
 
-use json_comments::StripComments;
 use lsp_types::{CompletionItem, CompletionItemKind};
-use serde::{de::DeserializeOwned, Deserialize, Deserializer, Serialize, Serializer};
+use once_cell::sync::Lazy;
+use parking_lot::Mutex;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     errors::Error,
@@ -55,6 +56,9 @@ impl Snippet {
     }
 }
 
+// TODO: watch file or restart lsp
+static SNIPPETS: Lazy<Mutex<HashMap<String, Snippets>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+
 /// 语言包
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct Snippets {
@@ -95,56 +99,51 @@ impl Snippets {
     /// # Errors
     ///
     /// This function will return an error if .
-    pub fn get_global(project_root: &PathBuf) -> Result<Snippets, Error> {
-        let global_all: HashMap<String, Snippet> = [
-            read_names(&project_root.join(".helix").join(Dirs::Snippets.to_string())),
-            read_names(&config_dir(Dirs::Snippets)),
-        ]
-        .concat()
-        .into_iter()
-        .rev()
-        .filter_map(|p| {
-            parse::<Snippets>(&p, p.file_stem().unwrap().to_string_lossy().into_owned()).ok()
-        })
-        .map(|l| l.snippets)
-        .fold(HashMap::new(), |mut acc, map| {
-            acc.extend(map);
-            acc
-        });
+    pub fn get_global(project_root: &PathBuf) -> Snippets {
+        let name = "global";
+        // check have
+        let mut snippets = SNIPPETS.lock();
+        match snippets.get(name) {
+            Some(has) => has.clone(),
+            None => {
+                let global_snippets = from_files(
+                    name.to_owned(),
+                    [
+                        read_names(&project_root.join(".helix").join(Dirs::Snippets.to_string())),
+                        read_names(&config_dir(Dirs::Snippets)),
+                    ]
+                    .concat(),
+                );
 
-        if global_all.is_empty() {
-            Err(Error::NotFound("Global Snippets".to_owned()))
-        } else {
-            Ok(Snippets {
-                name: "global".to_owned(),
-                snippets: global_all,
-            })
+                snippets.insert(name.to_owned(), global_snippets.clone());
+                global_snippets
+            }
         }
     }
 
     /// 获取 XDG_CONFIG_HOME 下的 `langid.json` 语言文件
-    pub fn get_lang(lang_name: String, project_root: &PathBuf) -> Result<Snippets, Error> {
-        let file_name = format!("{}.json", lang_name.clone().to_lowercase());
-        let snippets = [
-            project_root
-                .join(".helix")
-                .join(Dirs::Snippets.to_string())
-                .join(&file_name),
-            config_dir(Dirs::Snippets).join(&file_name),
-        ]
-        .into_iter()
-        .rev()
-        .filter(|p| p.exists())
-        .filter_map(|p| parse::<Snippets>(&p, lang_name.to_owned()).ok())
-        .fold(
-            Snippets::new(lang_name.to_owned(), HashMap::new()),
-            |mut acc, map| {
-                acc.extend(map);
-                acc
-            },
-        );
+    pub fn get_lang(lang_name: String, project_root: &PathBuf) -> Snippets {
+        let mut snippets_list = SNIPPETS.lock();
+        match snippets_list.get(&lang_name) {
+            Some(has) => has.clone(),
+            None => {
+                let file_name = format!("{}.json", lang_name.clone().to_lowercase());
+                let lang_snippets = from_files(
+                    lang_name.clone(),
+                    [
+                        project_root
+                            .join(".helix")
+                            .join(Dirs::Snippets.to_string())
+                            .join(&file_name),
+                        config_dir(Dirs::Snippets).join(&file_name),
+                    ]
+                    .to_vec(),
+                );
 
-        Ok(snippets)
+                snippets_list.insert(lang_name, lang_snippets.clone());
+                lang_snippets
+            }
+        }
     }
 
     /// 合并 snippets
@@ -159,6 +158,23 @@ impl Snippets {
             .filter_map(|(_name, snippet)| snippet.to_completion_item())
             .collect()
     }
+}
+
+fn from_files(name: String, files: Vec<PathBuf>) -> Snippets {
+    files
+        .into_iter()
+        .rev()
+        .filter(|p| p.exists())
+        .filter_map(|p| {
+            parse::<Snippets>(&p, p.file_stem().unwrap().to_string_lossy().into_owned()).ok()
+        })
+        .fold(
+            Snippets::new(name.to_owned(), HashMap::new()),
+            |mut acc, map| {
+                acc.extend(map);
+                acc
+            },
+        )
 }
 
 /// 读取文件夹内容，获取全局 `*.code-snippets` 文件路径
@@ -186,15 +202,7 @@ mod test {
         let root = std::env::current_dir().ok().unwrap();
         let lang = Snippets::get_lang("markdown".to_owned(), &root);
 
-        // eprintln!("{lang:?}");
-        match lang {
-            Ok(lang) => {
-                assert_eq!(lang.name, "markdown".to_owned(),);
-                assert!(lang.snippets.get("time").is_some());
-            }
-            Err(err) => {
-                eprintln!("{err}")
-            }
-        }
+        assert_eq!(lang.name, "markdown".to_owned(),);
+        assert!(lang.snippets.get("time").is_some());
     }
 }

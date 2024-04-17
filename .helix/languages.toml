@@ -5,6 +5,11 @@ args = ["--log"] # for dev
 
 [[language]]
 name = "markdown"
-# text-width = 80
-# soft-wrap = { enable = true, wrap-at-text-width = true }
 language-servers = ["hx-lsp"]
+
+[[language]]
+name = "html"
+language-servers = [
+  "vscode-html-language-server",
+  "hx-lsp"
+]
