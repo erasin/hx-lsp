@@ -1,5 +1,5 @@
 // dev
-#![allow(dead_code, unused_imports)]
+// #![allow(dead_code, unused_imports)]
 
 use std::{collections::HashMap, path::PathBuf, str::FromStr, sync::Arc};
 
@@ -8,13 +8,12 @@ use flexi_logger::{FileSpec, Logger, WriteMode};
 use lsp_server::Connection;
 use lsp_types::{
     notification::{
-        DidChangeTextDocument, DidChangeWatchedFiles, DidCloseTextDocument, DidOpenTextDocument,
-        DidSaveTextDocument, Notification,
+        DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, DidSaveTextDocument,
+        Notification,
     },
     request::{CodeActionRequest, CodeActionResolveRequest, Completion, Request},
-    CodeAction, CodeActionOptions, CodeActionProviderCapability, CodeActionResponse,
-    CompletionOptions, InitializeParams, Position, PositionEncodingKind, SaveOptions,
-    ServerCapabilities, TextDocumentContentChangeEvent, TextDocumentSyncCapability,
+    CodeAction, CodeActionOptions, CodeActionProviderCapability, CompletionOptions,
+    InitializeParams, SaveOptions, ServerCapabilities, TextDocumentSyncCapability,
     TextDocumentSyncKind, TextDocumentSyncOptions, TextDocumentSyncSaveOptions,
 };
 use parking_lot::Mutex;
@@ -29,10 +28,10 @@ mod snippet;
 mod variables;
 
 use errors::Error;
-use ropey::{Rope, RopeSlice};
+use ropey::Rope;
 use snippet::Snippets;
 
-use crate::encoding::{lsp_pos_to_pos, OffsetEncoding};
+use crate::encoding::{apply_content_change, OffsetEncoding};
 
 fn main() -> Result<(), Error> {
     if let Some(arg) = std::env::args().nth(1) {
@@ -258,12 +257,11 @@ impl Server {
                 // Option: change: Some(TextDocumentSyncKind::FULL),
                 // *doc = Rope::from(params.content_changes.last().unwrap().text.clone());
 
-                // 处理文本变更
-
                 // 增量更新
-                params.content_changes.into_iter().for_each(|change| {
-                    let _ = self.apply_content_change(&mut doc, &change, OffsetEncoding::Utf8);
-                });
+                for change in params.content_changes {
+                    // TODO: OffseetEncoding get from document
+                    apply_content_change(&mut doc, &change, OffsetEncoding::Utf8)?;
+                }
                 Ok(())
             }
 
@@ -279,12 +277,6 @@ impl Server {
 
                 let mut doc_lock = self.lang_doc.lock();
                 let doc = doc_lock.get_mut(uri).expect("undefind file path.");
-
-                // let mut doc = self
-                //     .lang_doc
-                //     .lock()
-                //     .get_mut(uri.clone())
-                //     .expect("undefind file path.");
 
                 *doc = Rope::from(params.text.unwrap());
 
@@ -347,100 +339,6 @@ impl Server {
         resolved_action.command = None;
 
         Ok(resolved_action)
-    }
-
-    pub fn apply_content_change(
-        &self,
-        doc: &mut Rope,
-        change: &TextDocumentContentChangeEvent,
-        offset_encoding: OffsetEncoding,
-    ) -> Result<(), Error> {
-        // https://gist.github.com/rojas-diego/04d9c4e3fff5f8374f29b9b738d541ef
-        match change.range {
-            Some(range) => {
-                assert!(
-                    range.start.line < range.end.line
-                        || (range.start.line == range.end.line
-                            && range.start.character <= range.end.character)
-                );
-
-                let same_line = range.start.line == range.end.line;
-                let same_character = range.start.character == range.end.character;
-
-                // 1. Get the line at which the change starts.
-                let change_start_line_idx = range.start.line as usize;
-                let change_start_line = match doc.get_line(change_start_line_idx) {
-                    Some(line) => line,
-                    None => {
-                        return Err(Error::PositionOutOfBounds(
-                            range.start.line,
-                            range.start.character,
-                        ))
-                    }
-                };
-
-                // 2. Get the line at which the change ends. (Small optimization
-                // where we first check whether start and end line are the
-                // same O(log N) lookup. We repeat this all throughout this
-                // function).
-                let change_end_line_idx = range.end.line as usize;
-                let change_end_line = match same_line {
-                    true => change_start_line,
-                    false => match doc.get_line(change_end_line_idx) {
-                        Some(line) => line,
-                        None => {
-                            return Err(Error::PositionOutOfBounds(
-                                range.end.line,
-                                range.end.character,
-                            ));
-                        }
-                    },
-                };
-
-                fn lsp_pos_to_pos(
-                    position_encoding: OffsetEncoding,
-                    position: &Position,
-                    slice: &RopeSlice,
-                ) -> Result<usize, Error> {
-                    match position_encoding {
-                        OffsetEncoding::Utf8 => slice.try_byte_to_char(position.character as usize),
-                        OffsetEncoding::Utf16 => {
-                            slice.try_utf16_cu_to_char(position.character as usize)
-                        }
-                        OffsetEncoding::Utf32 => Ok(position.character as usize),
-                    }
-                    .map_err(|_| Error::PositionOutOfBounds(position.line, position.character))
-                }
-
-                // 3. Compute the character offset into the start/end line where
-                // the change starts/ends.
-                let change_start_line_char_idx =
-                    lsp_pos_to_pos(offset_encoding, &range.start, &change_start_line).unwrap();
-                let change_end_line_char_idx = match same_line && same_character {
-                    true => change_start_line_char_idx,
-                    false => lsp_pos_to_pos(offset_encoding, &range.end, &change_end_line).unwrap(),
-                };
-
-                // 4. Compute the character and byte offset into the document
-                // where the change starts/ends.
-                let change_start_doc_char_idx =
-                    doc.line_to_char(change_start_line_idx) + change_start_line_char_idx;
-                let change_end_doc_char_idx = match same_line && same_character {
-                    true => change_start_doc_char_idx,
-                    false => doc.line_to_char(change_end_line_idx) + change_end_line_char_idx,
-                };
-
-                doc.remove(change_start_doc_char_idx..change_end_doc_char_idx);
-                doc.insert(change_start_doc_char_idx, &change.text);
-
-                return Ok(());
-            }
-            None => {
-                *doc = Rope::from_str(&change.text);
-
-                return Ok(());
-            }
-        }
     }
 }
 
