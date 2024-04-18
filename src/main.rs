@@ -21,7 +21,6 @@ use parking_lot::Mutex;
 mod action;
 mod encoding;
 mod errors;
-mod fuzzy;
 mod loader;
 mod parser;
 mod snippet;

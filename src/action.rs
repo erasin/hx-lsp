@@ -166,6 +166,7 @@ impl Actions {
                     if re.is_match(&line.to_string()) {
                         return Some((name, action));
                     }
+                    // TODO: 捕捉内容提供给脚本
                     // if let (captures) = re.captures(&line.to_string()){
                     //    if let Some(capture) = captures.get(1) {
                     //     let mut a = action.clone();
