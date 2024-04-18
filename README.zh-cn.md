@@ -76,7 +76,7 @@ Code snippets
     └── markdown.json
 ```
 
-snipet 格式：
+snippet 格式：
 
 - **name**: `String` 唯一内容，用于索引
 - **prefix**: `String` 或 `Vec<String>` 提供给 helix 编辑器的补全列表使用
@@ -120,7 +120,7 @@ snipet 格式：
     └── markdown.json
 ````
 
-snipet 格式：
+snippet 格式：
 
 - **title**: `String` helix 显示条目内容
 - **catch**: `String` 捕捉内容，regex 适配内容的时候，显示 code action

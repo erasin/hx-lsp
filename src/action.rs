@@ -130,7 +130,7 @@ impl Actions {
             }
         };
 
-        actions.fliter(doc, range);
+        actions.filter(doc, range);
         actions
     }
 
@@ -146,7 +146,7 @@ impl Actions {
             .collect()
     }
 
-    pub fn fliter(&mut self, doc: &Rope, range: &Range) {
+    pub fn filter(&mut self, doc: &Rope, range: &Range) {
         let line = doc.line(range.start.line as usize);
 
         let actions = self

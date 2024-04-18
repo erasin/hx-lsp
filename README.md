@@ -55,7 +55,7 @@ Actions file loading path:
 
 In LSP `textDocument/didOpen` request, The Configuration file with name that is `language_id.json` will be loading.
 
-> Unsupport Dynamic loading config. If you modify configuration file, use `:lsp-restart` to restart lsp and reload the file. 
+> Unsupported Dynamic loading config. If you modify configuration file, use `:lsp-restart` to restart lsp and reload the file. 
 
 
 ## Completion: snippets
@@ -120,12 +120,12 @@ Snippet Format：
     └── markdown.json
 ```
 
-Snipet Formater：
+Snippet Formatter：
 
 - **title**: `String` helix editor show Code Action Item
-- **catch**: `String` catch line conent，regex ，code action
+- **catch**: `String` catch line content，regex ，code action
 - **shell**: `String` Or `Vec<String>` , take shell script
-- **description**: `Option<String>` Tip conent
+- **description**: `Option<String>` Tip content
 
 ```jsonc
 {

@@ -74,6 +74,7 @@ fn run_lsp_server() -> Result<(), Error> {
                 })),
             },
         )),
+        // workspace: Some(WorkspaceServerCapabilities { }),
         ..Default::default()
     })
     .expect("Must be serializable");
@@ -198,6 +199,8 @@ impl Server {
                 })
             }
 
+            // DocumentDiagnosticRequest::METHOD
+            // WorkspaceDiagnosticRequest::METHOD
             unsupported => Err(Error::UnsupportedLspRequest {
                 request: unsupported.to_string(),
             }),
