@@ -103,8 +103,8 @@ impl Actions {
     /// This function will return an error if .
     pub fn get_lang(
         lang_name: String,
-        file_content: &Rope,
-        file_range: &Range,
+        doc: &Rope,
+        range: &Range,
         project_root: &PathBuf,
     ) -> Actions {
         let mut actions_list = ACTIONS.lock();
@@ -130,7 +130,7 @@ impl Actions {
             }
         };
 
-        actions.fliter(file_content, file_range);
+        actions.fliter(doc, range);
         actions
     }
 
@@ -146,8 +146,8 @@ impl Actions {
             .collect()
     }
 
-    pub fn fliter(&mut self, file_content: &Rope, file_range: &Range) {
-        let line = file_content.line(file_range.start.line as usize);
+    pub fn fliter(&mut self, doc: &Rope, range: &Range) {
+        let line = doc.line(range.start.line as usize);
 
         let actions = self
             .actions
@@ -166,6 +166,7 @@ impl Actions {
                     if re.is_match(&line.to_string()) {
                         return Some((name, action));
                     }
+
                     // TODO: 捕捉内容提供给脚本
                     // if let (captures) = re.captures(&line.to_string()){
                     //    if let Some(capture) = captures.get(1) {
