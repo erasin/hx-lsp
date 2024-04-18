@@ -143,3 +143,52 @@ Snipet Formater：
 - [x] regex line
 - [ ] selected content
 - [ ] match in regex
+
+
+## Variables
+
+Support variable for snippet body and action shell.
+
+Support like `$UUID` 和 `${UUID}`。
+
+**path**
+
+- [ ] `TM_SELECTED_TEXT`
+- [ ] `TM_CURRENT_LINE`
+- [ ] `TM_CURRENT_WORD`
+- [ ] `TM_LINE_INDEX`
+- [ ] `TM_LINE_NUMBER`
+- [ ] `TM_FILENAME`
+- [ ] `TM_FILENAME_BASE`
+- [ ] `TM_DIRECTORY`
+- [ ] `TM_FILEPATH`
+- [ ] `RELATIVE_FILEPATH`
+- [ ] `CLIPBOARD`
+- [ ] `WORKSPACE_NAME`
+- [ ] `WORKSPACE_FOLDER`
+
+**time**
+
+- [ ] `CURRENT_YEAR`
+- [ ] `CURRENT_YEAR_SHORT`
+- [ ] `CURRENT_MONTH`
+- [ ] `CURRENT_MONTH_NAME`
+- [ ] `CURRENT_MONTH_NAME_SHORT`
+- [ ] `CURRENT_DATE`
+- [ ] `CURRENT_DAY_NAME`
+- [ ] `CURRENT_DAY_NAME_SHORT`
+- [ ] `CURRENT_HOUR`
+- [ ] `CURRENT_MINUTE`
+- [ ] `CURRENT_SECOND`
+- [ ] `CURRENT_SECONDS_UNIX`
+- [ ] `CURRENT_TIMEZONE_OFFSET`
+
+**other**
+
+- [ ] `RANDOM`
+- [ ] `RANDOM_HEX`
+- [ ] `UUID`
+
+**action catch**
+
+- [ ] `CATCH1..9`
