@@ -1,6 +1,6 @@
 # hx-lsp
 
-[![中文文档](https://img.shields.io/badge/lang-zh_CN-red.svg)](./README.zh-cn.md)
+[![中文文档](https://img.shields.io/badge/lang-zh_CN-red.svg) 中文文档](./README.zh-cn.md)
 
 An LSP tool that provides custom code snippets and Code Actions for [Helix Editor](https://github.com/helix-editor/helix).
 

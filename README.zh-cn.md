@@ -18,6 +18,8 @@ cd hx-lsp
 cargo install --path .
 ```
 
+> 在 https://github.com/erasin/helix-config/ 中有示例代码，另外我自己使用的分支已经合并了 [helix#9081 Add a snippet system](https://github.com/helix-editor/helix/pull/9801)。
+
 ## 使用
 
 修改 helix 的语言配置文件 `languages.toml`， 修改下面文件任何一个即可
@@ -61,7 +63,8 @@ Actions 配置加载路径
 
 ## Completion: snippets
 
-code snippets 兼容 [vscode snippets](https://code.visualstudio.com/docs/editor/userdefinedsnippets) 格式。同样文件后缀支持 全局后缀`.code-snippets` 和 语言包后缀`.json`。
+Code snippets 
+兼容 [vscode snippets](https://code.visualstudio.com/docs/editor/userdefinedsnippets) 格式。同样文件后缀支持 全局后缀`.code-snippets` 和 语言包后缀`.json`。
 
 为了更好的使用 snippet 建议 heliix 合并 [helix#9081 Add a snippet system](https://github.com/helix-editor/helix/pull/9801) 以支持 smart-tab。
 
