@@ -2,14 +2,14 @@
 
 [![中文文档](https://img.shields.io/badge/lang-zh_CN-red.svg)](./README.zh-cn.md)
 
-一个提供了自定义代码片段 snippets 和 Code Action 的 lsp 工具。
+An LSP tool that provides custom code snippets and Code Actions for [Helix Editor](https://github.com/helix-editor/helix).
 
-## 功能
+## features
 
 - Completion: snippets
 - CodeAction: actions
 
-## 安装
+## Install
 
 ```sh
 git clone https://github.com/erasin/hx-lsp.git
@@ -17,29 +17,14 @@ cd hx-lsp
 cargo install --path .
 ```
 
-## LSP 参数
+## Use
 
+Modify the language configuration file `languages.toml` for Helix Editor. 
 
+- `$XDG_CONFIG_HOME/helix/languages.toml`: Helix Configuration file.
+- `WORKSPACE_ROOT/.helix/languages.toml` : Configuration file under project workspace root.
 
-## 配置文件
-
-文件加载路径
-
-- [x] `$XDG_CONFIG_HOME/Editor/snippets/`
-- [ ] `WORKSPACE_ROOT/.helix/snippets/`
-
-
-## Completion: snippets
-
-
-## CodeAction: actions
-
-
-
-
-修改 helix 配置文件 `$XDG_CONFIG_HOME/helix/languages.toml` 或者 项目目录下 `.helix/languages.toml`， 根据对应的语言追加 `language-servers` 配置。
-
-比如 markdown
+Example, Add support for markdown.
 
 ```toml
 [language-server.hx-lsp]
@@ -47,28 +32,114 @@ command = "hx-lsp"
 
 [[language]]
 name = "markdown"
-language-servers = ["hx-lsp"]
+language-servers = [ "marksman", "markdown-oxide", "hx-lsp" ]
 ```
 
-## snippets 自定义代码片段
+> About `language id`, Read [helix/languages.toml](https://github.com/helix-editor/helix/blob/master/languages.toml) and [helix wiki language server configurations](https://github.com/helix-editor/helix/wiki/Language-Server-Configurations)。
 
-snippet 定义为兼容 [vscode snippets](https://code.visualstudio.com/docs/editor/userdefinedsnippets) 格式。这样就可以直接和 vscode 通用片段。
+## Configuration
 
-为了更好的使用 snippet 建议 heliix 合并 [helix#9081](https://github.com/helix-editor/helix/pull/9801) 以支持 smart-tab。
+The Configuration file supports the `jsonc` format.
 
-配置 helix config 开启 `editor.auto-completion`,或者使用 `Ctrl+x` 打开补全列表。 
+> Comment style: `// ...`, `/* ... */`, `# ...` 。
 
-snippet 文件加载路径顺序为：
+Snippets file loading path:
 
-- [ ] `WORKSPACE_ROOT/.helix/snippets/`
-- [x] `$XDG_CONFIG_HOME/helix/snippets/`
+- `$XDG_CONFIG_HOME/helix/snippets/`
+- `WORKSPACE_ROOT/.helix/snippets/`
 
-加载的文件为 `语言id.json`, 和 `xxx.code-snippets` 全局文件。
+Actions file loading path:
 
-- 语言文件,比如 markdown.json, javascript.json , go.json
-- 全局文件，比如 global.code-snippets
+- `$XDG_CONFIG_HOME/helix/actions/`
+- `WORKSPACE_ROOT/.helix/actions/`
+
+In LSP `textDocument/didOpen` request, The Configuration file with name that is `language_id.json` will be loading.
+
+> Unsupport Dynamic loading config. If you modify configuration file, use `:lsp-restart` to restart lsp and reload the file. 
 
 
+## Completion: snippets
 
+Code Snippets support [vscode snippets](https://code.visualstudio.com/docs/editor/userdefinedsnippets) format. The same file suffix supports global suffixes such as`. code-snippets` and language pack suffixes such as`. json`.
 
+For better use snippet completion, Use helix master and merge [helix#9081 Add a snippet system](https://github.com/helix-editor/helix/pull/9801) to support smart-tab。
 
+```svgbob
+.
+└── snippets
+    ├── global.code-snippets
+    ├── html.json
+    └── markdown.json
+```
+
+Snippet Format：
+
+- **name**: `String`, index
+- **prefix**: `String` Or `Vec<String>`, editor completion item
+- **body**: `String` Or `Vec<String>`, snippet connent
+- **description**: `Option<String>`, Tip
+
+```jsonc
+{
+  "markdown a": {
+    // name
+    "prefix": "mda", // string
+    "body": "mda in .helix: ${1:abc} : ${2:cde}", // string
+    "description": "test a info content in .helix",
+  },
+  "markdown b": {
+    "prefix": [
+      // array
+      "mdb",
+    ],
+    "body": "mdb: ${1:abc} : ${2:cde}", // string
+    "description": "test b info content",
+  },
+  "markdown c": {
+    "prefix": [
+      // array
+      "mdc",
+      "mdd",
+    ],
+    "body": [
+      // array
+      "mda: ${1:abc} : ${2:cde}",
+      "test",
+    ],
+    "description": "test c,d info content",
+  },
+}
+```
+
+## CodeAction: actions
+
+```svgbob
+.
+└── actions
+    ├── html.json
+    └── markdown.json
+```
+
+Snipet Formater：
+
+- **title**: `String` helix editor show Code Action Item
+- **catch**: `String` catch line conent，regex ，code action
+- **shell**: `String` Or `Vec<String>` , take shell script
+- **description**: `Option<String>` Tip conent
+
+```jsonc
+{
+  "tmux split window helix": {
+    "title": "tmux split window in project",
+    "catch": "fn",
+    "shell": ["tmux split-window -h", "tmux send project"],
+    "description": "tmux split and open helix in project",
+  },
+}
+```
+
+**catch**：
+
+- [x] regex line
+- [ ] selected content
+- [ ] match in regex

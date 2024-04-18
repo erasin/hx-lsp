@@ -3,7 +3,14 @@
 [![English](https://img.shields.io/badge/lang-english-blue.svg)](./README.md)
 
 
-## install 
+一个提供了自定义代码片段 snippets 和 Code Action 的 lsp 工具。
+
+## 功能
+
+- Completion: snippets
+- CodeAction: actions
+
+## 安装
 
 ```sh
 git clone https://github.com/erasin/hx-lsp.git
@@ -11,9 +18,14 @@ cd hx-lsp
 cargo install --path .
 ```
 
-修改 helix 配置文件 `$XDG_CONFIG_HOME/helix/languages.toml` 或者 项目目录下 `.helix/languages.toml`， 根据对应的语言追加 `language-servers` 配置。
+## 使用
 
-比如 markdown
+修改 helix 的语言配置文件 `languages.toml`， 修改下面文件任何一个即可
+
+- `$XDG_CONFIG_HOME/helix/languages.toml` helix 配置文件
+- `WORKSPACE_ROOT/.helix/languages.toml` 项目下配置文件
+
+比如为 markdown 追加支持。
 
 ```toml
 [language-server.hx-lsp]
@@ -21,27 +33,116 @@ command = "hx-lsp"
 
 [[language]]
 name = "markdown"
-language-servers = ["hx-lsp"]
+language-servers = [ "marksman", "markdown-oxide", "hx-lsp" ]
 ```
 
-## snippets 自定义代码片段
-
-snippet 定义为兼容 [vscode snippets](https://code.visualstudio.com/docs/editor/userdefinedsnippets) 格式。这样就可以直接和 vscode 通用片段。
-
-为了更好的使用 snippet 建议 heliix 合并 [helix#9081](https://github.com/helix-editor/helix/pull/9801) 以支持 smart-tab。
-
-文件加载路径顺序为：
-
-- [ ] `WORKSPACE_ROOT/.helix/snippets/`
-- [o] `$XDG_CONFIG_HOME/helix/snippets/`
-
-加载的文件为 `语言id.json`, 和 `xxx.code-snippets` 全局文件。
-
-- 语言文件,比如 markdown.json, javascript.json , go.json
-- 全局文件，比如 global.code-snippets
+> 关于 `language id` 建议参考 [helix/languages.toml](https://github.com/helix-editor/helix/blob/master/languages.toml) 文件和 [helix wiki language server configurations](https://github.com/helix-editor/helix/wiki/Language-Server-Configurations)。
 
 
-## Actions 自定义
+## 配置文件
 
+配置文件支持 `jsonc` 格式，即支持注释内容，但不支持多余的 `,`。
+
+> 注释样式支持 `// ...`, `/* ... */`, `# ...` 。 
+
+Snippets 文件加载路径
+
+- `$XDG_CONFIG_HOME/helix/snippets/`
+-  `WORKSPACE_ROOT/.helix/snippets/`
+
+Actions 配置加载路径
+
+- `$XDG_CONFIG_HOME/helix/actions/`
+- `WORKSPACE_ROOT/.helix/actions/`
+
+配置在 `textDocument/didOpen` 时候加载 `language id` 同名 `lang_id.json` 文件。
+
+> 暂不支持配置文件的动态加载，修改配置文件后，可以使用 `:lsp-restart` 重启来重新加载文件。
+
+## Completion: snippets
+
+code snippets 兼容 [vscode snippets](https://code.visualstudio.com/docs/editor/userdefinedsnippets) 格式。同样文件后缀支持 全局后缀`.code-snippets` 和 语言包后缀`.json`。
+
+为了更好的使用 snippet 建议 heliix 合并 [helix#9081 Add a snippet system](https://github.com/helix-editor/helix/pull/9801) 以支持 smart-tab。
+
+```svgbob
+.
+└── snippets
+    ├── global.code-snippets
+    ├── html.json
+    └── markdown.json
+```
+
+snipet 格式：
+
+- **name**: `String` 唯一内容，用于索引
+- **prefix**: `String` 或 `Vec<String>` 提供给 helix 编辑器的补全列表使用
+- **body**: `String` 或 `Vec<String>` 
+- **description**: `Option<String>` 提示内容
+
+```jsonc
+{
+  "markdown a": { // name
+    "prefix": "mda", // string
+    "body": "mda in .helix: ${1:abc} : ${2:cde}", // string
+    "description": "test a info content in .helix"
+  },
+  "markdown b": {
+    "prefix": [ // array
+      "mdb" 
+    ],
+    "body": "mdb: ${1:abc} : ${2:cde}", // string
+    "description": "test b info content"
+  },
+  "markdown c": {
+    "prefix": [ // array
+      "mdc",
+      "mdd"
+    ],
+    "body": [ // array
+      "mda: ${1:abc} : ${2:cde}",
+      "test"
+    ],
+    "description": "test c,d info content"
+  }
+}
+```
+
+## CodeAction: actions
+
+```svgbob
+.
+└── actions
+    ├── html.json
+    └── markdown.json
+````
+
+snipet 格式：
+
+- **title**: `String` helix 显示条目内容
+- **catch**: `String` 捕捉内容，regex 适配内容的时候，显示 code action
+- **shell**: `String` 或 `Vec<String>` 执行的 shell 脚本
+- **description**: `Option<String>` 提示内容
+
+
+```jsonc
+{
+  "tmux split window helix": {
+    "title": "tmux split window in project",
+    "catch": "fn",
+    "shell": [
+      "tmux split-window -h",
+      "tmux send project"
+    ],
+    "description": "tmux split and open helix in project"
+  }
+}
+```
+
+**catch**：
+
+- [x] 捕捉行
+- [ ] 选择内容
+- [ ] 匹配内容
 
 
