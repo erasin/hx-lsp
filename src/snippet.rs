@@ -2,6 +2,7 @@ use std::{collections::HashMap, path::PathBuf};
 
 use aho_corasick::AhoCorasick;
 use anyhow::Result;
+use json_comments::CommentSettings;
 use lsp_types::{CompletionItem, CompletionItemKind};
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
@@ -37,16 +38,29 @@ pub struct Snippet {
     description: Option<String>,
 }
 
+fn to_completion_item(prefix: String, body: String, detail: String) -> CompletionItem {
+    let mut c = CompletionItem::new_simple(prefix, detail);
+    c.kind = Some(CompletionItemKind::SNIPPET);
+    c.insert_text = Some(body);
+    c
+}
+
 impl Snippet {
     /// 转换为 lsp 类型 CompletionItem
-    fn to_completion_item(&self) -> Option<CompletionItem> {
-        if let Some(prefix) = self.prefix.first() {
-            let mut c = CompletionItem::new_simple(prefix, self.description());
-            c.kind = Some(CompletionItemKind::SNIPPET);
-            c.insert_text = Some(self.body.to_string());
-            Some(c)
-        } else {
-            None
+    fn to_completion_item(&self) -> Vec<CompletionItem> {
+        match &self.prefix {
+            StrOrSeq::String(s) => [to_completion_item(
+                s.to_owned(),
+                self.body.to_string(),
+                self.description(),
+            )]
+            .to_vec(),
+            StrOrSeq::Array(arr) => arr
+                .into_iter()
+                .map(|s| {
+                    to_completion_item(s.to_owned(), self.body.to_string(), self.description())
+                })
+                .collect(),
         }
     }
 
@@ -158,8 +172,11 @@ impl Snippets {
     pub fn to_completion_items(&self) -> Vec<CompletionItem> {
         self.snippets
             .iter()
-            .filter_map(|(_name, snippet)| snippet.to_completion_item())
-            .collect()
+            .map(|(_name, snippet)| snippet.to_completion_item())
+            .fold(Vec::<CompletionItem>::new(), |mut a, b| {
+                a.extend(b.into_iter());
+                a
+            })
     }
 
     pub fn filter(&self, word: &str) -> Result<Snippets, Error> {
