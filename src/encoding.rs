@@ -83,7 +83,25 @@ pub fn apply_content_change(
     }
 }
 
-/// 获取变更时候最后的
+pub fn get_last_word_at_pos<'a>(line: &'a RopeSlice, line_character_pos: usize) -> Option<&'a str> {
+    if line_character_pos == 0 || line_character_pos > line.len_chars() {
+        return None;
+    }
+
+    let offset = line
+        .chars_at(line_character_pos)
+        .reversed()
+        .take_while(|&ch| char_is_punctuation(ch) || char_is_word(ch))
+        .count();
+
+    if offset == 0 {
+        return None;
+    }
+
+    line.slice(line_character_pos.saturating_sub(offset)..line_character_pos)
+        .as_str()
+}
+
 fn get_range_content<'a>(
     doc: &'a Rope,
     range: &Range,
@@ -100,4 +118,48 @@ fn get_range_content<'a>(
     };
     let s = doc.slice(start_idx..end_idx);
     Some(s)
+}
+
+#[inline]
+pub fn char_is_punctuation(ch: char) -> bool {
+    use unicode_general_category::{get_general_category, GeneralCategory};
+
+    matches!(
+        get_general_category(ch),
+        GeneralCategory::OtherPunctuation
+            | GeneralCategory::OpenPunctuation
+            | GeneralCategory::ClosePunctuation
+            | GeneralCategory::InitialPunctuation
+            | GeneralCategory::FinalPunctuation
+            | GeneralCategory::ConnectorPunctuation
+            | GeneralCategory::DashPunctuation
+            | GeneralCategory::MathSymbol
+            | GeneralCategory::CurrencySymbol
+            | GeneralCategory::ModifierSymbol
+    )
+}
+
+#[inline]
+pub fn char_is_word(ch: char) -> bool {
+    ch.is_alphanumeric() || ch == '_'
+}
+
+#[cfg(test)]
+mod test {
+
+    use crate::encoding::char_is_punctuation;
+
+    use super::get_last_word_at_pos;
+
+    #[test]
+    fn test_get_last() {
+        let line = ropey::RopeSlice::from("abcd ef1h");
+        let word = get_last_word_at_pos(&line, 7);
+        assert_eq!(Some("ef"), word);
+    }
+
+    #[test]
+    fn test_pun() {
+        assert!(char_is_punctuation(':'));
+    }
 }

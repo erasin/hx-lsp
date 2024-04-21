@@ -1,9 +1,5 @@
-// dev
-// #![allow(dead_code, unused_imports)]
-
 use std::{collections::HashMap, path::PathBuf, str::FromStr, sync::Arc};
 
-use action::Actions;
 use flexi_logger::{FileSpec, Logger, WriteMode};
 use lsp_server::Connection;
 use lsp_types::{
@@ -17,20 +13,15 @@ use lsp_types::{
     TextDocumentSyncKind, TextDocumentSyncOptions, TextDocumentSyncSaveOptions,
 };
 use parking_lot::Mutex;
-
-mod action;
-mod encoding;
-mod errors;
-mod loader;
-mod parser;
-mod snippet;
-mod variables;
-
-use errors::Error;
 use ropey::Rope;
-use snippet::Snippets;
 
-use crate::encoding::{apply_content_change, OffsetEncoding};
+use hx_lsp::encoding::{apply_content_change, char_is_punctuation, OffsetEncoding};
+use hx_lsp::errors::Error;
+use hx_lsp::snippet::Snippets;
+use hx_lsp::{
+    action::{shell_exec, Actions},
+    encoding::get_last_word_at_pos,
+};
 
 fn main() -> Result<(), Error> {
     if let Some(arg) = std::env::args().nth(1) {
@@ -62,6 +53,7 @@ fn run_lsp_server() -> Result<(), Error> {
             resolve_provider: Some(true),
             ..Default::default()
         })),
+        // definition_provider: Some(lsp_types::OneOf::Left(true)),
         text_document_sync: Some(TextDocumentSyncCapability::Options(
             TextDocumentSyncOptions {
                 open_close: Some(true),
@@ -106,6 +98,7 @@ pub struct Server {
     lang_id: HashMap<String, String>,
     lang_doc: Arc<Mutex<HashMap<String, Rope>>>,
     // snippets
+    #[allow(dead_code)]
     params: InitializeParams,
 }
 
@@ -298,23 +291,37 @@ impl Server {
     ) -> Option<Vec<lsp_types::CompletionItem>> {
         let uri = params.text_document_position.text_document.uri.path();
 
+        let pos = params.text_document_position.position;
+
         let lang_id = self.lang_id.get(uri)?;
 
-        let mut snippets = Snippets::get_lang(lang_id.clone(), &self.root);
-        snippets.extend(Snippets::get_global(&self.root));
+        // let mut snippets = Snippets::get_lang(lang_id.clone(), &self.root);
+        // snippets.extend(Snippets::get_global(&self.root));
 
-        // let snippets = [
-        //     Snippets::get_lang(lang_id.clone(), &self.root),
-        //     Snippets::get_global(&self.root),
-        // ]
-        // .into_iter()
-        // .filter_map(|r| r.ok())
-        // .fold(Snippets::default(), |mut lang, other| {
-        //     lang.extend(other);
-        //     lang
-        // });
+        let snippets = [
+            Snippets::get_lang(lang_id.clone(), &self.root),
+            Snippets::get_global(&self.root),
+        ]
+        .into_iter()
+        .fold(Snippets::default(), |mut lang, other| {
+            lang.extend(other);
+            lang
+        });
 
-        let snippets = snippets.to_completion_items();
+        let doc_lock = self.lang_doc.lock();
+        let doc = doc_lock.get(uri)?;
+        let line = doc.get_line(pos.line as usize)?;
+        let cursor_char = line.get_char(pos.character as usize - 1)?;
+
+        if char_is_punctuation(cursor_char) {
+            return None;
+        };
+
+        let snippets = match get_last_word_at_pos(&line, pos.character as usize) {
+            Some(word) => snippets.filter(word).ok()?.to_completion_items(),
+            None => snippets.to_completion_items(),
+        };
+
         Some(snippets)
     }
 
@@ -332,7 +339,7 @@ impl Server {
     fn action_resolve(&self, action: &CodeAction) -> Result<CodeAction, Error> {
         let cmd = action.clone().command.expect("unknow cmd");
 
-        action::shell_exec(cmd.command.as_str())?;
+        shell_exec(cmd.command.as_str())?;
 
         // 设置 title 和 tooltip
         let mut resolved_action = action.clone();

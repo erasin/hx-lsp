@@ -40,6 +40,9 @@ pub enum Error {
     PathToUri(#[from] url::ParseError),
 
     #[error(transparent)]
+    Aho(#[from] aho_corasick::BuildError),
+
+    #[error(transparent)]
     #[diagnostic(code(lsp::log))]
     Logger(#[from] flexi_logger::FlexiLoggerError),
 

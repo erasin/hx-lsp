@@ -1,5 +1,3 @@
-use std::ops::Index;
-
 use rand::distributions::{Distribution, Uniform};
 use time::{format_description, OffsetDateTime};
 use uuid::Uuid;
@@ -10,6 +8,11 @@ use uuid::Uuid;
 //     R: lsp_types::request::Request,
 //     R::Params: serde::de::DeserializeOwned,
 pub fn convert(str: &mut String) {
+
+    // let ac = AhoCorasick::builder()
+    //     .ascii_case_insensitive(true)
+    //     .build([&word])?;
+
     // let a = Variables::to_vec()
     //     .into_iter()
     //     .map(|v| (v.to_string(), v))

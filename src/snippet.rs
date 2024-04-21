@@ -1,5 +1,7 @@
 use std::{collections::HashMap, path::PathBuf};
 
+use aho_corasick::AhoCorasick;
+use anyhow::Result;
 use lsp_types::{CompletionItem, CompletionItemKind};
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
@@ -7,6 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     errors::Error,
+    fuzzy::fuzzy_match,
     loader::{config_dir, Dirs},
     parser::{parse, Parser, StrOrSeq},
 };
@@ -157,6 +160,26 @@ impl Snippets {
             .iter()
             .filter_map(|(_name, snippet)| snippet.to_completion_item())
             .collect()
+    }
+
+    pub fn filter(&self, word: &str) -> Result<Snippets, Error> {
+        log::debug!("---> word {word:?}");
+
+        let names: HashMap<String, String> = self
+            .clone()
+            .snippets
+            .into_iter()
+            .map(|(title, snippet)| (snippet.prefix.to_string(), title))
+            .collect();
+
+        let re = fuzzy_match(word, names.clone().into_keys(), false)
+            .into_iter()
+            .filter_map(|(name, _)| names.get(&name))
+            .filter_map(|f| self.snippets.get_key_value(f))
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+
+        Ok(Snippets::new(self.name.clone(), re))
     }
 }
 
