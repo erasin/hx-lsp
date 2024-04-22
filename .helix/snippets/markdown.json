@@ -21,5 +21,15 @@
       "test"
     ],
     "description": "test c,d info content"
+  },
+  "variable 1": {
+    "prefix": "mdtime",
+    "body": [
+      "Year: ${CURRENT_YEAR}",
+      "Time: $CURRENT_MONTH_NAME",
+      "UUID: $UUID",
+      "Rand: $RANDOM"
+    ],
+    "description": "test a info content in .helix"
   }
 }

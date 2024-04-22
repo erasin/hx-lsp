@@ -1,23 +1,9 @@
+use std::fmt::format;
+
+use aho_corasick::AhoCorasick;
 use rand::distributions::{Distribution, Uniform};
 use time::{format_description, OffsetDateTime};
 use uuid::Uuid;
-
-/// 转化处理
-// pub fn convert<R>(str: String, params: R::Params) -> String
-// where
-//     R: lsp_types::request::Request,
-//     R::Params: serde::de::DeserializeOwned,
-pub fn convert(str: &mut String) {
-
-    // let ac = AhoCorasick::builder()
-    //     .ascii_case_insensitive(true)
-    //     .build([&word])?;
-
-    // let a = Variables::to_vec()
-    //     .into_iter()
-    //     .map(|v| (v.to_string(), v))
-    // .map(|x|)
-}
 
 /// 兼容 [vscode snippet variables](https://code.visualstudio.com/docs/editor/userdefinedsnippets#_variables)
 #[derive(Debug, Clone, Copy)]
@@ -161,14 +147,14 @@ impl Variables {
             Variables::WorkspaceFolder,
             // Variables::CursorIndex,
             // Variables::CursorNumber,
-            Variables::CurrentYear,
             Variables::CurrentYearShort,
-            Variables::CurrentMonth,
-            Variables::CurrentMonthName,
+            Variables::CurrentYear,
             Variables::CurrentMonthNameShort,
+            Variables::CurrentMonthName,
+            Variables::CurrentMonth,
             Variables::CurrentDate,
-            Variables::CurrentDayName,
             Variables::CurrentDayNameShort,
+            Variables::CurrentDayName,
             Variables::CurrentHour,
             Variables::CurrentMinute,
             Variables::CurrentSecond,
@@ -184,23 +170,23 @@ impl Variables {
         .to_vec()
     }
 
-    pub fn convert(&self) -> String {
+    fn callback(&self) -> String {
         match self {
-            Variables::TmSelectedText => todo!(),
-            Variables::TmCurrentLine => todo!(),
-            Variables::TmCurrentWord => todo!(),
-            Variables::TmLineIndex => todo!(),
-            Variables::TmLineNumber => todo!(),
-            Variables::TmFilename => todo!(),
-            Variables::TmFilenameBase => todo!(),
-            Variables::TmDirectory => todo!(),
-            Variables::TmFilepath => todo!(),
-            Variables::RelativeFilepath => todo!(),
-            Variables::Clipboard => todo!(),
-            Variables::WorkspaceName => todo!(),
-            Variables::WorkspaceFolder => todo!(),
-            Variables::CursorIndex => todo!(),
-            Variables::CursorNumber => todo!(),
+            Variables::TmSelectedText => self.to_string(),
+            Variables::TmCurrentLine => self.to_string(),
+            Variables::TmCurrentWord => self.to_string(),
+            Variables::TmLineIndex => self.to_string(),
+            Variables::TmLineNumber => self.to_string(),
+            Variables::TmFilename => self.to_string(),
+            Variables::TmFilenameBase => self.to_string(),
+            Variables::TmDirectory => self.to_string(),
+            Variables::TmFilepath => self.to_string(),
+            Variables::RelativeFilepath => self.to_string(),
+            Variables::Clipboard => self.to_string(),
+            Variables::WorkspaceName => self.to_string(),
+            Variables::WorkspaceFolder => self.to_string(),
+            Variables::CursorIndex => self.to_string(),
+            Variables::CursorNumber => self.to_string(),
 
             Variables::CurrentYear => OffsetDateTime::now_utc().year().to_string(),
             Variables::CurrentYearShort => year_short(),
@@ -220,11 +206,42 @@ impl Variables {
             Variables::RandomHex => random_hex(),
             Variables::Uuid => Uuid::new_v4().to_string(),
 
-            Variables::BlockCommentStart => todo!(),
-            Variables::BlockCommentEnd => todo!(),
-            Variables::LineComment => todo!(),
+            Variables::BlockCommentStart => self.to_string(),
+            Variables::BlockCommentEnd => self.to_string(),
+            Variables::LineComment => self.to_string(),
         }
     }
+
+    /// 转化处理
+    pub fn convert(&self, text: &String) -> String {
+        let str = self.to_string();
+        let str_replace = self.callback();
+        if str_replace.is_empty() {
+            return text.clone();
+        }
+
+        let patterns = &[format!("${str}"), format!("${{{str}}}")];
+        let replace_with = &[str_replace.to_owned(), str_replace];
+
+        let ac = AhoCorasick::builder()
+            .ascii_case_insensitive(true)
+            .build(patterns.into_iter())
+            .unwrap();
+
+        let re = ac
+            .try_replace_all(text, replace_with)
+            .unwrap_or(text.to_owned());
+        re
+    }
+}
+
+pub fn convert_all(text: &String) -> String {
+    let mut text = text.clone();
+    Variables::to_vec()
+        .into_iter()
+        .for_each(|f| text = f.convert(&text));
+
+    text
 }
 
 fn year_short() -> String {
@@ -277,6 +294,10 @@ fn random_hex() -> String {
 mod test {
     use time::{format_description, OffsetDateTime};
 
+    use crate::variables::Variables;
+
+    use super::convert_all;
+
     #[test]
     fn test_time_format() {
         // let format = format
@@ -286,6 +307,25 @@ mod test {
         .unwrap();
         let m = OffsetDateTime::now_utc().format(&format).unwrap();
 
-        eprintln!("--> {m}");
+        eprintln!("time: {m}");
+    }
+
+    #[test]
+    fn test_convert() {
+        let text = String::from("Word is ${CURRENT_YEAR_SHORT} or $CURRENT_YEAR_SHORT");
+
+        let v = Variables::CurrentYearShort;
+        let re = v.convert(&text);
+
+        assert_ne!(re, "Word is abc or abc");
+    }
+
+    #[test]
+    fn test_convert_all() {
+        let text = String::from("Word is ${CURRENT_YEAR} or $CURRENT_YEAR_SHORT");
+
+        let re = convert_all(&text);
+
+        assert_eq!(re, "test");
     }
 }

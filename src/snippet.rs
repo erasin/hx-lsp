@@ -13,6 +13,7 @@ use crate::{
     fuzzy::fuzzy_match,
     loader::{config_dir, Dirs},
     parser::{parse, Parser, StrOrSeq},
+    variables::convert_all,
 };
 
 /// 代码片段
@@ -48,18 +49,19 @@ fn to_completion_item(prefix: String, body: String, detail: String) -> Completio
 impl Snippet {
     /// 转换为 lsp 类型 CompletionItem
     fn to_completion_item(&self) -> Vec<CompletionItem> {
+        let body = self.body.to_string();
+        let body = convert_all(&body);
+
         match &self.prefix {
             StrOrSeq::String(s) => [to_completion_item(
                 s.to_owned(),
-                self.body.to_string(),
+                body.to_owned(),
                 self.description(),
             )]
             .to_vec(),
             StrOrSeq::Array(arr) => arr
                 .into_iter()
-                .map(|s| {
-                    to_completion_item(s.to_owned(), self.body.to_string(), self.description())
-                })
+                .map(|s| to_completion_item(s.to_owned(), body.to_owned(), self.description()))
                 .collect(),
         }
     }
