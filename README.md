@@ -169,25 +169,25 @@ Support like `$UUID` 和 `${UUID}`。
 
 **time**
 
-- [ ] `CURRENT_YEAR`
-- [ ] `CURRENT_YEAR_SHORT`
-- [ ] `CURRENT_MONTH`
-- [ ] `CURRENT_MONTH_NAME`
-- [ ] `CURRENT_MONTH_NAME_SHORT`
-- [ ] `CURRENT_DATE`
-- [ ] `CURRENT_DAY_NAME`
-- [ ] `CURRENT_DAY_NAME_SHORT`
-- [ ] `CURRENT_HOUR`
-- [ ] `CURRENT_MINUTE`
-- [ ] `CURRENT_SECOND`
-- [ ] `CURRENT_SECONDS_UNIX`
-- [ ] `CURRENT_TIMEZONE_OFFSET`
+- [x] `CURRENT_YEAR`
+- [x] `CURRENT_YEAR_SHORT`
+- [x] `CURRENT_MONTH`
+- [x] `CURRENT_MONTH_NAME`
+- [x] `CURRENT_MONTH_NAME_SHORT`
+- [x] `CURRENT_DATE`
+- [x] `CURRENT_DAY_NAME`
+- [x] `CURRENT_DAY_NAME_SHORT`
+- [x] `CURRENT_HOUR`
+- [x] `CURRENT_MINUTE`
+- [x] `CURRENT_SECOND`
+- [x] `CURRENT_SECONDS_UNIX`
+- [x] `CURRENT_TIMEZONE_OFFSET`
 
 **other**
 
-- [ ] `RANDOM`
-- [ ] `RANDOM_HEX`
-- [ ] `UUID`
+- [x] `RANDOM`
+- [x] `RANDOM_HEX`
+- [x] `UUID`
 
 **action catch**
 

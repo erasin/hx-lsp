@@ -1,5 +1,3 @@
-use std::fmt::format;
-
 use aho_corasick::AhoCorasick;
 use rand::distributions::{Distribution, Uniform};
 use time::{format_description, OffsetDateTime};
@@ -130,11 +128,22 @@ impl ToString for Variables {
 }
 
 impl Variables {
+    /// 转换字符串内的变量
+    pub fn convert_all(text: &String) -> String {
+        let mut text = text.clone();
+        Variables::to_vec()
+            .into_iter()
+            .for_each(|f| text = f.convert(&text));
+
+        text
+    }
+
+    /// 获可支持的字段
     fn to_vec() -> Vec<Variables> {
         [
-            // Variables::TmSelectedText,
-            // Variables::TmCurrentLine,
-            // Variables::TmCurrentWord,
+            Variables::TmSelectedText,
+            Variables::TmCurrentLine,
+            Variables::TmCurrentWord,
             Variables::TmLineIndex,
             Variables::TmLineNumber,
             Variables::TmFilename,
@@ -170,7 +179,8 @@ impl Variables {
         .to_vec()
     }
 
-    fn callback(&self) -> String {
+    /// 转化的内容
+    fn to_value(&self) -> String {
         match self {
             Variables::TmSelectedText => self.to_string(),
             Variables::TmCurrentLine => self.to_string(),
@@ -212,10 +222,10 @@ impl Variables {
         }
     }
 
-    /// 转化处理
+    /// 替换处理
     pub fn convert(&self, text: &String) -> String {
         let str = self.to_string();
-        let str_replace = self.callback();
+        let str_replace = self.to_value();
         if str_replace.is_empty() {
             return text.clone();
         }
@@ -233,15 +243,6 @@ impl Variables {
             .unwrap_or(text.to_owned());
         re
     }
-}
-
-pub fn convert_all(text: &String) -> String {
-    let mut text = text.clone();
-    Variables::to_vec()
-        .into_iter()
-        .for_each(|f| text = f.convert(&text));
-
-    text
 }
 
 fn year_short() -> String {
@@ -277,7 +278,10 @@ fn day_name_short() -> String {
 fn random() -> String {
     let step = Uniform::new(0, 9);
     let mut rng = rand::thread_rng();
-    step.sample_iter(&mut rng).take(6).map(char::from).collect()
+    step.sample_iter(&mut rng)
+        .take(6)
+        .map(|f| f.to_string())
+        .collect()
 }
 
 fn random_hex() -> String {
@@ -292,40 +296,23 @@ fn random_hex() -> String {
 
 #[cfg(test)]
 mod test {
-    use time::{format_description, OffsetDateTime};
-
-    use crate::variables::Variables;
-
-    use super::convert_all;
-
-    #[test]
-    fn test_time_format() {
-        // let format = format
-        let format = format_description::parse(
-            "[year] [year repr:last_two] [month] [month repr:short] [month repr:long] [day] [weekday repr:long] [weekday repr:short] ",
-        )
-        .unwrap();
-        let m = OffsetDateTime::now_utc().format(&format).unwrap();
-
-        eprintln!("time: {m}");
-    }
+    use super::Variables;
 
     #[test]
     fn test_convert() {
-        let text = String::from("Word is ${CURRENT_YEAR_SHORT} or $CURRENT_YEAR_SHORT");
+        let text = String::from("${CURRENT_YEAR_SHORT} or $CURRENT_YEAR_SHORT");
 
         let v = Variables::CurrentYearShort;
         let re = v.convert(&text);
 
-        assert_ne!(re, "Word is abc or abc");
+        assert_eq!(re.len(), 8);
     }
 
     #[test]
     fn test_convert_all() {
-        let text = String::from("Word is ${CURRENT_YEAR} or $CURRENT_YEAR_SHORT");
+        let text = String::from("${CURRENT_YEAR} or $CURRENT_YEAR_SHORT");
+        let re = Variables::convert_all(&text);
 
-        let re = convert_all(&text);
-
-        assert_eq!(re, "test");
+        assert_eq!(re.len(), 10);
     }
 }

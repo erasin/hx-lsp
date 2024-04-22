@@ -15,6 +15,7 @@ use crate::{
     errors::Error,
     loader::{config_dir, Dirs},
     parser::{parse, Parser, StrOrSeq},
+    variables::Variables,
 };
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
@@ -29,13 +30,12 @@ pub struct Action {
 impl Action {
     /// 转换 lsp 格式
     fn to_code_action_item(&self) -> Option<CodeAction> {
-        // if self.catch.is_empty() {
-        //     return None;
-        // }
+        let shell = self.shell.to_string();
+        let shell = Variables::convert_all(&shell);
 
         let command = lsp_types::Command {
             title: "Run Test".to_string(),
-            command: self.shell.to_string(),
+            command: shell,
             arguments: None,
         };
 
@@ -56,6 +56,7 @@ impl Action {
     }
 
     /// 获取 description, 兼容空对象
+    #[allow(dead_code)]
     fn description(&self) -> String {
         match &self.description {
             Some(s) => s.clone(),
@@ -96,11 +97,6 @@ impl Actions {
         Actions { name, actions }
     }
 
-    /// .
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if .
     pub fn get_lang(
         lang_name: String,
         doc: &Rope,

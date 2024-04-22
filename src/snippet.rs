@@ -1,8 +1,6 @@
 use std::{collections::HashMap, path::PathBuf};
 
-use aho_corasick::AhoCorasick;
 use anyhow::Result;
-use json_comments::CommentSettings;
 use lsp_types::{CompletionItem, CompletionItemKind};
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
@@ -13,7 +11,7 @@ use crate::{
     fuzzy::fuzzy_match,
     loader::{config_dir, Dirs},
     parser::{parse, Parser, StrOrSeq},
-    variables::convert_all,
+    variables::Variables,
 };
 
 /// 代码片段
@@ -50,7 +48,7 @@ impl Snippet {
     /// 转换为 lsp 类型 CompletionItem
     fn to_completion_item(&self) -> Vec<CompletionItem> {
         let body = self.body.to_string();
-        let body = convert_all(&body);
+        let body = Variables::convert_all(&body);
 
         match &self.prefix {
             StrOrSeq::String(s) => [to_completion_item(
