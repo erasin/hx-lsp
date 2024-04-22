@@ -1,38 +1,52 @@
+use std::path::PathBuf;
+
 use aho_corasick::AhoCorasick;
 use rand::distributions::{Distribution, Uniform};
 use time::{format_description, OffsetDateTime};
 use uuid::Uuid;
 
+use crate::encoding::char_is_word;
+
+#[derive(Debug, Default)]
+pub struct VariableInit {
+    pub file_path: PathBuf,
+    pub work_path: PathBuf,
+    pub line_text: String,
+    pub current_word: String,
+    pub selected_text: String,
+    pub line_pos: usize,
+}
+
 /// 兼容 [vscode snippet variables](https://code.visualstudio.com/docs/editor/userdefinedsnippets#_variables)
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum Variables {
     // The following variables can be used:
     /// The currently selected text or the empty string
-    TmSelectedText,
+    TmSelectedText(String),
     /// The contents of the current line
-    TmCurrentLine,
+    TmCurrentLine(String),
     /// The contents of the word under cursor or the empty string
-    TmCurrentWord,
+    TmCurrentWord(String),
     /// The zero-index based line number
-    TmLineIndex,
+    TmLineIndex(usize),
     /// The one-index based line number
-    TmLineNumber,
+    TmLineNumber(usize),
     /// The filename of the current document
-    TmFilename,
+    TmFilename(PathBuf),
     /// The filename of the current document without its extensions
-    TmFilenameBase,
+    TmFilenameBase(PathBuf),
     /// The directory of the current document
-    TmDirectory,
+    TmDirectory(PathBuf),
     /// The full file path of the current document
-    TmFilepath,
+    TmFilepath(PathBuf),
     /// The relative (to the opened workspace or folder) file path of the current document
-    RelativeFilepath,
+    RelativeFilepath(PathBuf),
     /// The contents of your clipboard
     Clipboard,
     /// The name of the opened workspace or folder
-    WorkspaceName,
+    WorkspaceName(PathBuf),
     /// The path of the opened workspace or folder
-    WorkspaceFolder,
+    WorkspaceFolder(PathBuf),
     /// The zero-index based cursor number
     CursorIndex,
     /// The one-index based cursor number
@@ -86,19 +100,19 @@ pub enum Variables {
 impl ToString for Variables {
     fn to_string(&self) -> String {
         match self {
-            Variables::TmSelectedText => "TM_SELECTED_TEXT".to_owned(),
-            Variables::TmCurrentLine => "TM_CURRENT_LINE".to_owned(),
-            Variables::TmCurrentWord => "TM_CURRENT_WORD".to_owned(),
-            Variables::TmLineIndex => "TM_LINE_INDEX".to_owned(),
-            Variables::TmLineNumber => "TM_LINE_NUMBER".to_owned(),
-            Variables::TmFilename => "TM_FILENAME".to_owned(),
-            Variables::TmFilenameBase => "TM_FILENAME_BASE".to_owned(),
-            Variables::TmDirectory => "TM_DIRECTORY".to_owned(),
-            Variables::TmFilepath => "TM_FILEPATH".to_owned(),
-            Variables::RelativeFilepath => "RELATIVE_FILEPATH".to_owned(),
+            Variables::TmSelectedText(_) => "TM_SELECTED_TEXT".to_owned(),
+            Variables::TmCurrentLine(_) => "TM_CURRENT_LINE".to_owned(),
+            Variables::TmCurrentWord(_) => "TM_CURRENT_WORD".to_owned(),
+            Variables::TmLineIndex(_) => "TM_LINE_INDEX".to_owned(),
+            Variables::TmLineNumber(_) => "TM_LINE_NUMBER".to_owned(),
+            Variables::TmFilename(_) => "TM_FILENAME".to_owned(),
+            Variables::TmFilenameBase(_) => "TM_FILENAME_BASE".to_owned(),
+            Variables::TmDirectory(_) => "TM_DIRECTORY".to_owned(),
+            Variables::TmFilepath(_) => "TM_FILEPATH".to_owned(),
+            Variables::RelativeFilepath(_) => "RELATIVE_FILEPATH".to_owned(),
             Variables::Clipboard => "CLIPBOARD".to_owned(),
-            Variables::WorkspaceName => "WORKSPACE_NAME".to_owned(),
-            Variables::WorkspaceFolder => "WORKSPACE_FOLDER".to_owned(),
+            Variables::WorkspaceName(_) => "WORKSPACE_NAME".to_owned(),
+            Variables::WorkspaceFolder(_) => "WORKSPACE_FOLDER".to_owned(),
             Variables::CursorIndex => "CURSOR_INDEX".to_owned(),
             Variables::CursorNumber => "CURSOR_NUMBER".to_owned(),
 
@@ -129,9 +143,9 @@ impl ToString for Variables {
 
 impl Variables {
     /// 转换字符串内的变量
-    pub fn convert_all(text: &String) -> String {
+    pub fn convert_all(text: &String, init: &VariableInit) -> String {
         let mut text = text.clone();
-        Variables::to_vec()
+        Variables::to_vec(init)
             .into_iter()
             .for_each(|f| text = f.convert(&text));
 
@@ -139,21 +153,21 @@ impl Variables {
     }
 
     /// 获可支持的字段
-    fn to_vec() -> Vec<Variables> {
+    fn to_vec(init: &VariableInit) -> Vec<Variables> {
         [
-            Variables::TmSelectedText,
-            Variables::TmCurrentLine,
-            Variables::TmCurrentWord,
-            Variables::TmLineIndex,
-            Variables::TmLineNumber,
-            Variables::TmFilename,
-            Variables::TmFilenameBase,
-            Variables::TmDirectory,
-            Variables::TmFilepath,
-            Variables::RelativeFilepath,
+            Variables::TmSelectedText(init.selected_text.clone()),
+            Variables::TmCurrentLine(init.line_text.clone()),
+            Variables::TmCurrentWord(init.current_word.clone()),
+            Variables::TmLineIndex(init.line_pos),
+            Variables::TmLineNumber(init.line_pos + 1),
+            Variables::TmFilenameBase(init.file_path.clone()),
+            Variables::TmFilename(init.file_path.clone()),
+            Variables::TmDirectory(init.file_path.clone()),
+            Variables::TmFilepath(init.file_path.clone()),
+            Variables::RelativeFilepath(init.file_path.clone()),
             // Variables::Clipboard,
-            Variables::WorkspaceName,
-            Variables::WorkspaceFolder,
+            Variables::WorkspaceName(init.work_path.clone()),
+            Variables::WorkspaceFolder(init.work_path.clone()),
             // Variables::CursorIndex,
             // Variables::CursorNumber,
             Variables::CurrentYearShort,
@@ -182,19 +196,36 @@ impl Variables {
     /// 转化的内容
     fn to_value(&self) -> String {
         match self {
-            Variables::TmSelectedText => self.to_string(),
-            Variables::TmCurrentLine => self.to_string(),
-            Variables::TmCurrentWord => self.to_string(),
-            Variables::TmLineIndex => self.to_string(),
-            Variables::TmLineNumber => self.to_string(),
-            Variables::TmFilename => self.to_string(),
-            Variables::TmFilenameBase => self.to_string(),
-            Variables::TmDirectory => self.to_string(),
-            Variables::TmFilepath => self.to_string(),
-            Variables::RelativeFilepath => self.to_string(),
+            Variables::TmSelectedText(str) => str.to_string(),
+            Variables::TmCurrentLine(str) => str.to_string(),
+            Variables::TmCurrentWord(str) => str.to_string(),
+            Variables::TmLineIndex(line_pos) => line_pos.to_string(),
+            Variables::TmLineNumber(line_pos) => line_pos.to_string(),
+            Variables::TmFilename(file_path) => {
+                file_path.file_name().unwrap().to_str().unwrap().to_string()
+            }
+            Variables::TmFilenameBase(file_path) => file_path
+                .file_name()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .to_string()
+                .chars()
+                .take_while(|&ch| char_is_word(ch))
+                .collect(),
+            Variables::TmDirectory(file_path) => file_path
+                .parent()
+                .unwrap()
+                .to_str()
+                .unwrap_or("")
+                .to_owned(),
+            Variables::TmFilepath(file_path) => file_path.to_str().unwrap_or("").to_owned(),
+            Variables::RelativeFilepath(file_path) => file_path.to_str().unwrap_or("").to_string(),
             Variables::Clipboard => self.to_string(),
-            Variables::WorkspaceName => self.to_string(),
-            Variables::WorkspaceFolder => self.to_string(),
+            Variables::WorkspaceName(work_path) => {
+                work_path.file_name().unwrap().to_str().unwrap().to_string()
+            }
+            Variables::WorkspaceFolder(work_path) => work_path.to_str().unwrap_or("").to_string(),
             Variables::CursorIndex => self.to_string(),
             Variables::CursorNumber => self.to_string(),
 
@@ -296,6 +327,8 @@ fn random_hex() -> String {
 
 #[cfg(test)]
 mod test {
+    use crate::variables::VariableInit;
+
     use super::Variables;
 
     #[test]
@@ -311,7 +344,8 @@ mod test {
     #[test]
     fn test_convert_all() {
         let text = String::from("${CURRENT_YEAR} or $CURRENT_YEAR_SHORT");
-        let re = Variables::convert_all(&text);
+
+        let re = Variables::convert_all(&text, &VariableInit::default());
 
         assert_eq!(re.len(), 10);
     }

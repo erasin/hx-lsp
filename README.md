@@ -153,19 +153,19 @@ Support like `$UUID` 和 `${UUID}`。
 
 **path**
 
-- [ ] `TM_SELECTED_TEXT`
-- [ ] `TM_CURRENT_LINE`
-- [ ] `TM_CURRENT_WORD`
-- [ ] `TM_LINE_INDEX`
-- [ ] `TM_LINE_NUMBER`
-- [ ] `TM_FILENAME`
-- [ ] `TM_FILENAME_BASE`
-- [ ] `TM_DIRECTORY`
-- [ ] `TM_FILEPATH`
-- [ ] `RELATIVE_FILEPATH`
+- [x] `TM_SELECTED_TEXT`
+- [x] `TM_CURRENT_LINE`
+- [x] `TM_CURRENT_WORD`
+- [x] `TM_LINE_INDEX`
+- [x] `TM_LINE_NUMBER`
+- [x] `TM_FILENAME`
+- [x] `TM_FILENAME_BASE`
+- [x] `TM_DIRECTORY`
+- [x] `TM_FILEPATH`
+- [x] `RELATIVE_FILEPATH`
 - [ ] `CLIPBOARD`
-- [ ] `WORKSPACE_NAME`
-- [ ] `WORKSPACE_FOLDER`
+- [x] `WORKSPACE_NAME`
+- [x] `WORKSPACE_FOLDER`
 
 **time**
 

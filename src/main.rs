@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::PathBuf, str::FromStr, sync::Arc};
+use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
 use flexi_logger::{FileSpec, Logger, WriteMode};
 use lsp_server::Connection;
@@ -15,12 +15,15 @@ use lsp_types::{
 use parking_lot::Mutex;
 use ropey::Rope;
 
-use hx_lsp::encoding::{apply_content_change, char_is_punctuation, OffsetEncoding};
-use hx_lsp::errors::Error;
 use hx_lsp::snippet::Snippets;
 use hx_lsp::{
     action::{shell_exec, Actions},
     encoding::get_last_word_at_pos,
+};
+use hx_lsp::{encoding::get_range_content, errors::Error};
+use hx_lsp::{
+    encoding::{apply_content_change, char_is_punctuation, OffsetEncoding},
+    variables::VariableInit,
 };
 
 fn main() -> Result<(), Error> {
@@ -105,8 +108,7 @@ pub struct Server {
 impl Server {
     fn new(params: &InitializeParams) -> Self {
         let root = if let Some(ws) = params.workspace_folders.clone() {
-            let p = ws.first().unwrap().uri.path();
-            PathBuf::from_str(p).unwrap()
+            ws.first().unwrap().uri.to_file_path().unwrap()
         } else {
             std::env::current_dir().ok().unwrap()
         };
@@ -317,12 +319,37 @@ impl Server {
             return None;
         };
 
+        let mut cursor_word = String::new();
+
         let snippets = match get_last_word_at_pos(&line, pos.character as usize) {
-            Some(word) => snippets.filter(word).ok()?.to_completion_items(),
-            None => snippets.to_completion_items(),
+            Some(word) => {
+                cursor_word = word.to_string();
+                snippets.filter(word).ok()?
+            }
+            None => snippets,
         };
 
-        Some(snippets)
+        let variable_init = VariableInit {
+            file_path: params
+                .text_document_position
+                .text_document
+                .uri
+                .to_file_path()
+                .unwrap(),
+            work_path: self
+                .params
+                .root_uri
+                .clone()
+                .unwrap()
+                .to_file_path()
+                .unwrap(),
+            line_pos: params.text_document_position.position.line as usize,
+            line_text: line.to_string(),
+            current_word: cursor_word,
+            selected_text: Default::default(),
+        };
+
+        Some(snippets.to_completion_items(&variable_init))
     }
 
     fn actions(&self, params: lsp_types::CodeActionParams) -> Option<Vec<lsp_types::CodeAction>> {
@@ -331,9 +358,31 @@ impl Server {
         let doc_lock = self.lang_doc.lock();
         let doc = doc_lock.get(uri)?;
 
+        let line = doc.get_line(params.range.end.line as usize)?;
+        let cursor_word = get_last_word_at_pos(&line, params.range.end.character as usize)
+            .unwrap_or(Default::default());
+
         let actions = Actions::get_lang(lang_id.clone(), doc, &params.range, &self.root);
 
-        Some(actions.to_code_action_items())
+        let range_content =
+            get_range_content(&doc, &params.range, OffsetEncoding::Utf8).unwrap_or("".into());
+
+        let variable_init = VariableInit {
+            file_path: params.text_document.uri.to_file_path().unwrap(),
+            work_path: self
+                .params
+                .root_uri
+                .clone()
+                .unwrap()
+                .to_file_path()
+                .unwrap(),
+            line_pos: params.range.start.line as usize,
+            line_text: line.to_string(),
+            current_word: cursor_word.to_string(),
+            selected_text: range_content.to_string(),
+        };
+
+        Some(actions.to_code_action_items(&variable_init))
     }
 
     fn action_resolve(&self, action: &CodeAction) -> Result<CodeAction, Error> {

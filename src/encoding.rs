@@ -103,7 +103,7 @@ pub fn get_last_word_at_pos<'a>(line: &'a RopeSlice, line_character_pos: usize) 
 }
 
 /// 获取内容
-fn get_range_content<'a>(
+pub fn get_range_content<'a>(
     doc: &'a Rope,
     range: &Range,
     offset_encoding: OffsetEncoding,

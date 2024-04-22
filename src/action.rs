@@ -15,7 +15,7 @@ use crate::{
     errors::Error,
     loader::{config_dir, Dirs},
     parser::{parse, Parser, StrOrSeq},
-    variables::Variables,
+    variables::{VariableInit, Variables},
 };
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
@@ -29,9 +29,9 @@ pub struct Action {
 
 impl Action {
     /// 转换 lsp 格式
-    fn to_code_action_item(&self) -> Option<CodeAction> {
+    fn to_code_action_item(&self, variable_init: &VariableInit) -> Option<CodeAction> {
         let shell = self.shell.to_string();
-        let shell = Variables::convert_all(&shell);
+        let shell = Variables::convert_all(&shell, variable_init);
 
         let command = lsp_types::Command {
             title: "Run Test".to_string(),
@@ -135,10 +135,10 @@ impl Actions {
         self.actions.extend(other.actions);
     }
 
-    pub fn to_code_action_items(&self) -> Vec<CodeAction> {
+    pub fn to_code_action_items(&self, variable_init: &VariableInit) -> Vec<CodeAction> {
         self.actions
             .iter()
-            .filter_map(|(_name, action)| action.to_code_action_item())
+            .filter_map(|(_name, action)| action.to_code_action_item(variable_init))
             .collect()
     }
 

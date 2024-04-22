@@ -11,7 +11,7 @@ use crate::{
     fuzzy::fuzzy_match,
     loader::{config_dir, Dirs},
     parser::{parse, Parser, StrOrSeq},
-    variables::Variables,
+    variables::{VariableInit, Variables},
 };
 
 /// 代码片段
@@ -46,9 +46,9 @@ fn to_completion_item(prefix: String, body: String, detail: String) -> Completio
 
 impl Snippet {
     /// 转换为 lsp 类型 CompletionItem
-    fn to_completion_item(&self) -> Vec<CompletionItem> {
+    fn to_completion_item(&self, variable_init: &VariableInit) -> Vec<CompletionItem> {
         let body = self.body.to_string();
-        let body = Variables::convert_all(&body);
+        let body = Variables::convert_all(&body, variable_init);
 
         match &self.prefix {
             StrOrSeq::String(s) => [to_completion_item(
@@ -169,10 +169,10 @@ impl Snippets {
     }
 
     /// 转换 snippets 为 lsp 的提示类型
-    pub fn to_completion_items(&self) -> Vec<CompletionItem> {
+    pub fn to_completion_items(&self, variable_init: &VariableInit) -> Vec<CompletionItem> {
         self.snippets
             .iter()
-            .map(|(_name, snippet)| snippet.to_completion_item())
+            .map(|(_name, snippet)| snippet.to_completion_item(variable_init))
             .fold(Vec::<CompletionItem>::new(), |mut a, b| {
                 a.extend(b.into_iter());
                 a
@@ -180,8 +180,6 @@ impl Snippets {
     }
 
     pub fn filter(&self, word: &str) -> Result<Snippets, Error> {
-        log::debug!("---> word {word:?}");
-
         let names: HashMap<String, String> = self
             .clone()
             .snippets
