@@ -29,7 +29,14 @@ time = { version = "0.3.36", features = ["formatting"] }
 unicode-general-category = "0.6.0"
 url = "2.5.0"
 uuid = { version = "1.8.0", features = ["v4"] }
+which = "6.0.1"
 
+[target.'cfg(windows)'.dependencies]
+clipboard-win = { version = "5.3", features = ["std"] }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+rustix = { version = "0.38", features = ["fs"] }
 
 [profile.release]
 opt-level = "z"

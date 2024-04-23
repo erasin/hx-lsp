@@ -15,11 +15,11 @@ use lsp_types::{
 use parking_lot::Mutex;
 use ropey::Rope;
 
-use hx_lsp::snippet::Snippets;
 use hx_lsp::{
     action::{shell_exec, Actions},
     encoding::get_last_word_at_pos,
 };
+use hx_lsp::{clipboard::get_clipboard_provider, snippet::Snippets};
 use hx_lsp::{encoding::get_range_content, errors::Error};
 use hx_lsp::{
     encoding::{apply_content_change, char_is_punctuation, OffsetEncoding},
@@ -336,17 +336,14 @@ impl Server {
                 .uri
                 .to_file_path()
                 .unwrap(),
-            work_path: self
-                .params
-                .root_uri
-                .clone()
-                .unwrap()
-                .to_file_path()
-                .unwrap(),
+            work_path: self.root.clone(),
             line_pos: params.text_document_position.position.line as usize,
             line_text: line.to_string(),
             current_word: cursor_word,
             selected_text: Default::default(),
+            clipboard: get_clipboard_provider()
+                .get_contents()
+                .unwrap_or(Default::default()),
         };
 
         Some(snippets.to_completion_items(&variable_init))
@@ -369,17 +366,14 @@ impl Server {
 
         let variable_init = VariableInit {
             file_path: params.text_document.uri.to_file_path().unwrap(),
-            work_path: self
-                .params
-                .root_uri
-                .clone()
-                .unwrap()
-                .to_file_path()
-                .unwrap(),
+            work_path: self.root.clone(),
             line_pos: params.range.start.line as usize,
             line_text: line.to_string(),
             current_word: cursor_word.to_string(),
             selected_text: range_content.to_string(),
+            clipboard: get_clipboard_provider()
+                .get_contents()
+                .unwrap_or(Default::default()),
         };
 
         Some(actions.to_code_action_items(&variable_init))

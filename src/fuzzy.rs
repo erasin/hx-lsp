@@ -1,4 +1,4 @@
-// file from helix-core
+// File Base on helix-core/src/fuzzy.rs
 use std::ops::DerefMut;
 
 use nucleo::pattern::{Atom, AtomKind, CaseMatching, Normalization};

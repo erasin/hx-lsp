@@ -15,6 +15,7 @@ pub struct VariableInit {
     pub current_word: String,
     pub selected_text: String,
     pub line_pos: usize,
+    pub clipboard: String,
 }
 
 /// 兼容 [vscode snippet variables](https://code.visualstudio.com/docs/editor/userdefinedsnippets#_variables)
@@ -42,7 +43,7 @@ pub enum Variables {
     /// The relative (to the opened workspace or folder) file path of the current document
     RelativeFilepath(PathBuf),
     /// The contents of your clipboard
-    Clipboard,
+    Clipboard(String),
     /// The name of the opened workspace or folder
     WorkspaceName(PathBuf),
     /// The path of the opened workspace or folder
@@ -110,7 +111,7 @@ impl ToString for Variables {
             Variables::TmDirectory(_) => "TM_DIRECTORY".to_owned(),
             Variables::TmFilepath(_) => "TM_FILEPATH".to_owned(),
             Variables::RelativeFilepath(_) => "RELATIVE_FILEPATH".to_owned(),
-            Variables::Clipboard => "CLIPBOARD".to_owned(),
+            Variables::Clipboard(_) => "CLIPBOARD".to_owned(),
             Variables::WorkspaceName(_) => "WORKSPACE_NAME".to_owned(),
             Variables::WorkspaceFolder(_) => "WORKSPACE_FOLDER".to_owned(),
             Variables::CursorIndex => "CURSOR_INDEX".to_owned(),
@@ -165,11 +166,11 @@ impl Variables {
             Variables::TmDirectory(init.file_path.clone()),
             Variables::TmFilepath(init.file_path.clone()),
             Variables::RelativeFilepath(init.file_path.clone()),
-            // Variables::Clipboard,
+            Variables::Clipboard(init.clipboard.clone()),
             Variables::WorkspaceName(init.work_path.clone()),
             Variables::WorkspaceFolder(init.work_path.clone()),
-            // Variables::CursorIndex,
-            // Variables::CursorNumber,
+            Variables::CursorIndex,
+            Variables::CursorNumber,
             Variables::CurrentYearShort,
             Variables::CurrentYear,
             Variables::CurrentMonthNameShort,
@@ -221,7 +222,7 @@ impl Variables {
                 .to_owned(),
             Variables::TmFilepath(file_path) => file_path.to_str().unwrap_or("").to_owned(),
             Variables::RelativeFilepath(file_path) => file_path.to_str().unwrap_or("").to_string(),
-            Variables::Clipboard => self.to_string(),
+            Variables::Clipboard(s) => s.to_string(),
             Variables::WorkspaceName(work_path) => {
                 work_path.file_name().unwrap().to_str().unwrap().to_string()
             }
