@@ -5,7 +5,7 @@ use lsp_server::Connection;
 use lsp_types::{
     notification::{
         DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, DidSaveTextDocument,
-        Notification,
+        Exit, Notification,
     },
     request::{CodeActionRequest, CodeActionResolveRequest, Completion, Request},
     CodeAction, CodeActionOptions, CodeActionProviderCapability, CompletionOptions,
@@ -212,19 +212,24 @@ impl Server {
     /// lsp 提示处理
     fn handle_notification(&mut self, notification: lsp_server::Notification) -> Result<(), Error> {
         match notification.method.as_str() {
+            Exit::METHOD => {
+                // exit
+                Ok(())
+            }
+
             // 打开文件
             DidOpenTextDocument::METHOD => {
                 let params = cast_notification::<DidOpenTextDocument>(notification)?;
                 log::debug!("OpenFile: {params:?}");
-                let uri = params.text_document.uri.path().to_string();
+                let uri = params.text_document.uri.path();
 
                 // ropey
                 let doc = Rope::from(params.text_document.text);
 
                 // 记录打开文件所对应的文件语言ID, 内容
                 self.lang_id
-                    .insert(uri.clone(), params.text_document.language_id);
-                self.lang_doc.lock().insert(uri.clone(), doc);
+                    .insert(uri.to_string(), params.text_document.language_id);
+                self.lang_doc.lock().insert(uri.to_string(), doc);
 
                 Ok::<(), Error>(())
             }
@@ -249,16 +254,17 @@ impl Server {
                 let uri = params.text_document.uri.path();
 
                 let mut doc_lock = self.lang_doc.lock();
-                let mut doc = doc_lock.get_mut(uri).expect("undefind file path.");
+                if let Some(doc) = doc_lock.get_mut(uri) {
+                    // 增量更新
+                    for change in params.content_changes {
+                        // OffseetEncoding get from document
+                        apply_content_change(doc, &change, OffsetEncoding::Utf8)?;
+                    }
+                };
 
                 // Option: change: Some(TextDocumentSyncKind::FULL),
                 // *doc = Rope::from(params.content_changes.last().unwrap().text.clone());
 
-                // 增量更新
-                for change in params.content_changes {
-                    // TODO: OffseetEncoding get from document
-                    apply_content_change(&mut doc, &change, OffsetEncoding::Utf8)?;
-                }
                 Ok(())
             }
 
@@ -271,12 +277,13 @@ impl Server {
                 let params = cast_notification::<DidSaveTextDocument>(notification)?;
                 log::debug!("SaveFile: {params:?}");
                 let uri = params.text_document.uri.path();
-
+                let save = Rope::from(params.text.unwrap());
                 let mut doc_lock = self.lang_doc.lock();
-                let doc = doc_lock.get_mut(uri).expect("undefind file path.");
-
-                *doc = Rope::from(params.text.unwrap());
-
+                if let Some(doc) = doc_lock.get_mut(uri) {
+                    *doc = save;
+                } else {
+                    doc_lock.insert(uri.to_string(), save);
+                }
                 Ok(())
             }
 
@@ -292,10 +299,12 @@ impl Server {
         params: lsp_types::CompletionParams,
     ) -> Option<Vec<lsp_types::CompletionItem>> {
         let uri = params.text_document_position.text_document.uri.path();
-
         let pos = params.text_document_position.position;
-
-        let lang_id = self.lang_id.get(uri)?;
+        let lang_id = if let Some(lang_id) = self.lang_id.get(uri) {
+            lang_id
+        } else {
+            return None;
+        };
 
         // let mut snippets = Snippets::get_lang(lang_id.clone(), &self.root);
         // snippets.extend(Snippets::get_global(&self.root));
@@ -311,7 +320,9 @@ impl Server {
         });
 
         let doc_lock = self.lang_doc.lock();
-        let doc = doc_lock.get(uri)?;
+        let doc = doc_lock
+            .get(uri)
+            .expect(format!("unknown cachefile of {uri}").as_str());
         let line = doc.get_line(pos.line as usize)?;
 
         if is_field(&line, pos.character as usize) {
