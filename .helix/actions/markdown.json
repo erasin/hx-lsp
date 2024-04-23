@@ -4,7 +4,7 @@
     "catch": "fn",
     "shell": [
       "tmux split-window -h",
-      "tmux send project"
+      "tmux send ${TM_CURRENT_WORD}"
     ],
     "description": "tmux split and open helix in project"
   }

@@ -83,23 +83,53 @@ pub fn apply_content_change(
     }
 }
 
-pub fn get_last_word_at_pos<'a>(line: &'a RopeSlice, line_character_pos: usize) -> Option<&'a str> {
+//  If input as field or attribute return true.
+pub fn is_field<'a>(line: &'a RopeSlice, line_character_pos: usize) -> bool {
+    if line_character_pos == 0 || line_character_pos > line.len_chars() {
+        return false;
+    }
+
+    let mut after_punctuation = false;
+    let _offset = line
+        .chars_at(line_character_pos)
+        .reversed()
+        .take_while(|&ch| {
+            if char_is_punctuation(ch) {
+                after_punctuation = true;
+                return true;
+            }
+            char_is_word(ch)
+        })
+        .count();
+
+    after_punctuation
+}
+
+pub fn get_current_word<'a>(line: &'a RopeSlice, line_character_pos: usize) -> Option<&'a str> {
     if line_character_pos == 0 || line_character_pos > line.len_chars() {
         return None;
     }
 
-    let offset = line
+    let offset_sub = line
         .chars_at(line_character_pos)
         .reversed()
-        .take_while(|&ch| char_is_punctuation(ch) || char_is_word(ch))
+        .take_while(|&ch| char_is_word(ch))
         .count();
 
-    if offset == 0 {
+    let offset_add = line
+        .chars_at(line_character_pos)
+        .take_while(|&ch| char_is_word(ch))
+        .count();
+
+    if offset_sub == 0 && offset_add == 0 {
         return None;
     }
 
-    line.slice(line_character_pos.saturating_sub(offset)..line_character_pos)
-        .as_str()
+    line.slice(
+        line_character_pos.saturating_sub(offset_sub)
+            ..line_character_pos.saturating_add(offset_add),
+    )
+    .as_str()
 }
 
 /// 获取内容
@@ -150,12 +180,12 @@ mod test {
 
     use crate::encoding::char_is_punctuation;
 
-    use super::get_last_word_at_pos;
+    use super::get_current_word;
 
     #[test]
     fn test_get_last() {
         let line = ropey::RopeSlice::from("abcd ef1h");
-        let word = get_last_word_at_pos(&line, 7);
+        let word = get_current_word(&line, 7);
         assert_eq!(Some("ef"), word);
     }
 

@@ -15,7 +15,7 @@ pub struct VariableInit {
     pub current_word: String,
     pub selected_text: String,
     pub line_pos: usize,
-    pub clipboard: String,
+    pub clipboard: Option<String>,
 }
 
 /// 兼容 [vscode snippet variables](https://code.visualstudio.com/docs/editor/userdefinedsnippets#_variables)
@@ -166,7 +166,7 @@ impl Variables {
             Variables::TmDirectory(init.file_path.clone()),
             Variables::TmFilepath(init.file_path.clone()),
             Variables::RelativeFilepath(init.file_path.clone()),
-            Variables::Clipboard(init.clipboard.clone()),
+            Variables::Clipboard(init.clipboard.clone().unwrap_or(Default::default())),
             Variables::WorkspaceName(init.work_path.clone()),
             Variables::WorkspaceFolder(init.work_path.clone()),
             Variables::CursorIndex,

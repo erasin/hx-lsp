@@ -17,12 +17,12 @@ use ropey::Rope;
 
 use hx_lsp::{
     action::{shell_exec, Actions},
-    encoding::get_last_word_at_pos,
+    encoding::{get_current_word, is_field},
 };
 use hx_lsp::{clipboard::get_clipboard_provider, snippet::Snippets};
 use hx_lsp::{encoding::get_range_content, errors::Error};
 use hx_lsp::{
-    encoding::{apply_content_change, char_is_punctuation, OffsetEncoding},
+    encoding::{apply_content_change, OffsetEncoding},
     variables::VariableInit,
 };
 
@@ -313,15 +313,14 @@ impl Server {
         let doc_lock = self.lang_doc.lock();
         let doc = doc_lock.get(uri)?;
         let line = doc.get_line(pos.line as usize)?;
-        let cursor_char = line.get_char(pos.character as usize - 1)?;
 
-        if char_is_punctuation(cursor_char) {
+        if is_field(&line, pos.character as usize) {
             return None;
         };
 
         let mut cursor_word = String::new();
 
-        let snippets = match get_last_word_at_pos(&line, pos.character as usize) {
+        let snippets = match get_current_word(&line, pos.character as usize) {
             Some(word) => {
                 cursor_word = word.to_string();
                 snippets.filter(word).ok()?
@@ -341,9 +340,7 @@ impl Server {
             line_text: line.to_string(),
             current_word: cursor_word,
             selected_text: Default::default(),
-            clipboard: get_clipboard_provider()
-                .get_contents()
-                .unwrap_or(Default::default()),
+            clipboard: get_clipboard_provider().get_contents().ok(),
         };
 
         Some(snippets.to_completion_items(&variable_init))
@@ -356,7 +353,7 @@ impl Server {
         let doc = doc_lock.get(uri)?;
 
         let line = doc.get_line(params.range.end.line as usize)?;
-        let cursor_word = get_last_word_at_pos(&line, params.range.end.character as usize)
+        let cursor_word = get_current_word(&line, params.range.end.character as usize)
             .unwrap_or(Default::default());
 
         let actions = Actions::get_lang(lang_id.clone(), doc, &params.range, &self.root);
@@ -371,9 +368,7 @@ impl Server {
             line_text: line.to_string(),
             current_word: cursor_word.to_string(),
             selected_text: range_content.to_string(),
-            clipboard: get_clipboard_provider()
-                .get_contents()
-                .unwrap_or(Default::default()),
+            clipboard: get_clipboard_provider().get_contents().ok(),
         };
 
         Some(actions.to_code_action_items(&variable_init))
