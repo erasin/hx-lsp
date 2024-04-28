@@ -1,9 +1,14 @@
 [package]
 name = "hx-lsp"
 version = "0.1.0"
+authors = ["erasin <erasinoo@gmail.com>"]
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+description = "One LSP server support snippets and actions for helix editor."
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/erasin/hx-lsp"
+keywords = ["helix", "lsp", "snippets"]
+exclude = [".helix"]
 
 [dependencies]
 aho-corasick = "1.1.3"

@@ -130,7 +130,7 @@ impl Actions {
         actions
     }
 
-    /// 合并 actions
+    /// merge actions
     pub fn extend(&mut self, other: Actions) {
         self.actions.extend(other.actions);
     }

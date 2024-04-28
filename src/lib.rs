@@ -7,6 +7,7 @@ pub mod env;
 pub mod errors;
 pub mod fuzzy;
 pub mod loader;
+pub mod lsp;
 pub mod parser;
 pub mod snippet;
 pub mod variables;
