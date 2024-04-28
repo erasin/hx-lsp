@@ -129,13 +129,28 @@ snippet 格式：
 
 
 ```jsonc
+/* actions/go.json */
+{
+  "run main": {
+    "title": "go run main",
+    "catch": "func main",
+    "shell": [
+      "alacritty --working-directory ${TM_DIRECTORY} -e go run ${TM_FILENAME}"
+    ],
+    "description": "go run main"
+  }
+}
+```
+
+```json
+/* test */
 {
   "tmux split window helix": {
     "title": "tmux split window in project",
     "catch": "fn",
     "shell": [
       "tmux split-window -h",
-      "tmux send project"
+      "tmux send cd ${WORKSPACE_FOLDER}"
     ],
     "description": "tmux split and open helix in project"
   }

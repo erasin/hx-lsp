@@ -128,13 +128,31 @@ Snippet Formatter：
 - **description**: `Option<String>` Tip content
 
 ```jsonc
+/* actions/go.json */
+{
+  "run main": {
+    "title": "go run main",
+    "catch": "func main",
+    "shell": [
+      "alacritty --working-directory ${TM_DIRECTORY} -e go run ${TM_FILENAME}"
+    ],
+    "description": "go run main"
+  }
+}
+```
+
+```jsonc
+/* test */
 {
   "tmux split window helix": {
     "title": "tmux split window in project",
     "catch": "fn",
-    "shell": ["tmux split-window -h", "tmux send project"],
-    "description": "tmux split and open helix in project",
-  },
+    "shell": [
+      "tmux split-window -h",
+      "tmux send cd ${WORKSPACE_FOLDER}"
+    ],
+    "description": "tmux split and open helix in project"
+  }
 }
 ```
 
