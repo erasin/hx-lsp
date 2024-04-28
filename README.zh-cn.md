@@ -135,7 +135,7 @@ snippet 格式：
     "title": "go run main",
     "catch": "func main",
     "shell": [
-      "alacritty --working-directory ${TM_DIRECTORY} -e go run ${TM_FILENAME}"
+      "alacritty --hold --working-directory ${TM_DIRECTORY} -e go run ${TM_FILENAME}"
     ],
     "description": "go run main"
   }
@@ -150,7 +150,7 @@ snippet 格式：
     "catch": "fn",
     "shell": [
       "tmux split-window -h",
-      "tmux send cd ${WORKSPACE_FOLDER}"
+      "tmux send \"cd ${WORKSPACE_FOLDER}\n\""
     ],
     "description": "tmux split and open helix in project"
   }
