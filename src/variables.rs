@@ -231,17 +231,17 @@ impl Variables {
             Variables::CursorNumber => self.to_string(),
 
             Variables::CurrentYear => OffsetDateTime::now_utc().year().to_string(),
-            Variables::CurrentYearShort => year_short(),
-            Variables::CurrentMonth => month(),
-            Variables::CurrentMonthName => month_name(),
-            Variables::CurrentMonthNameShort => month_name_short(),
-            Variables::CurrentDate => OffsetDateTime::now_utc().day().to_string(),
-            Variables::CurrentDayName => day_name(),
-            Variables::CurrentDayNameShort => day_name_short(),
-            Variables::CurrentHour => OffsetDateTime::now_utc().hour().to_string(),
-            Variables::CurrentMinute => OffsetDateTime::now_utc().minute().to_string(),
-            Variables::CurrentSecond => OffsetDateTime::now_utc().second().to_string(),
-            Variables::CurrentSecondsUnix => OffsetDateTime::now_utc().unix_timestamp().to_string(),
+            Variables::CurrentYearShort => time_format("[year repr:last_two]"),
+            Variables::CurrentMonth => time_format("[month]"),
+            Variables::CurrentMonthName => time_format("[month repr:long]"),
+            Variables::CurrentMonthNameShort => time_format("[month repr:short]"),
+            Variables::CurrentDate => time_format("[day]"),
+            Variables::CurrentDayName => time_format("[weekday repr:long]"),
+            Variables::CurrentDayNameShort => time_format("[weekday repr:short]"),
+            Variables::CurrentHour => time_format("[hour repr:24]"),
+            Variables::CurrentMinute => time_format("[minute]"),
+            Variables::CurrentSecond => time_format("[second]"),
+            Variables::CurrentSecondsUnix => time_format("[unix_timestamp precision:nanosecond]"),
             Variables::CurrentTimezoneOffset => OffsetDateTime::now_utc().offset().to_string(),
 
             Variables::Random => random(),
@@ -277,34 +277,18 @@ impl Variables {
     }
 }
 
-fn year_short() -> String {
-    let format = format_description::parse("[year repr:last_two]").unwrap();
-    OffsetDateTime::now_utc().format(&format).unwrap()
-}
-
-fn month() -> String {
-    let format = format_description::parse("[month]").unwrap();
-    OffsetDateTime::now_utc().format(&format).unwrap()
-}
-
-fn month_name() -> String {
-    let format = format_description::parse("[month repr:long]").unwrap();
-    OffsetDateTime::now_utc().format(&format).unwrap()
-}
-
-fn month_name_short() -> String {
-    let format = format_description::parse("[month repr:short]").unwrap();
-    OffsetDateTime::now_utc().format(&format).unwrap()
-}
-
-fn day_name() -> String {
-    let format = format_description::parse("[weekday repr:long]").unwrap();
-    OffsetDateTime::now_utc().format(&format).unwrap()
-}
-
-fn day_name_short() -> String {
-    let format = format_description::parse("[weekday repr:short] ").unwrap();
-    OffsetDateTime::now_utc().format(&format).unwrap()
+fn time_format(s: &str) -> String {
+    match format_description::parse(s) {
+        Ok(format) =>
+        // TODO FIX get error in unix
+        {
+            OffsetDateTime::now_local()
+                .unwrap_or(OffsetDateTime::now_utc())
+                .format(&format)
+                .unwrap_or(s.to_string())
+        }
+        Err(_) => s.to_owned(),
+    }
 }
 
 fn random() -> String {
@@ -328,7 +312,8 @@ fn random_hex() -> String {
 
 #[cfg(test)]
 mod test {
-    use crate::variables::VariableInit;
+
+    use crate::variables::{time_format, VariableInit};
 
     use super::Variables;
 
@@ -346,7 +331,12 @@ mod test {
     fn test_convert_all() {
         let text = String::from("${CURRENT_YEAR} or $CURRENT_YEAR_SHORT");
 
-        let re = Variables::convert_all(&text, &VariableInit::default());
+        let mut vars = VariableInit::default();
+        let root = std::env::current_dir().ok().unwrap();
+        vars.file_path = root.clone();
+        vars.work_path = root.clone();
+
+        let re = Variables::convert_all(&text, &vars);
 
         assert_eq!(re.len(), 10);
     }
