@@ -149,6 +149,15 @@ snippet 格式：
       "alacritty --hold --working-directory ${TM_DIRECTORY} -e go run ${TM_FILENAME}"
     ],
     "description": "go run main"
+  },
+  "run main in tmux": {
+    "title": "tmux: go run main",
+    "catch": "func main",
+    "shell": [
+      "tmux split-window -h -c ${WORKSPACE_FOLDER};",
+      "tmux send 'go build' Enter"
+    ],
+    "description": "go run main"
   }
 }
 ```
