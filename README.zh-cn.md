@@ -12,6 +12,14 @@
 
 ## 安装
 
+**从crate安装**
+
+```sh
+cargo install --force hx-lsp
+```
+
+**源码编译**
+
 ```sh
 git clone https://github.com/erasin/hx-lsp.git
 cd hx-lsp

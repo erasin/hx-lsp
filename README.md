@@ -11,6 +11,14 @@ An LSP tool that provides custom code snippets and Code Actions for [Helix Edito
 
 ## Install
 
+**From crate**
+
+```sh
+cargo install --force hx-lsp
+```
+
+**From source**
+
 ```sh
 git clone https://github.com/erasin/hx-lsp.git
 cd hx-lsp
