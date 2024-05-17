@@ -22,10 +22,13 @@ cargo install --path .
 
 ## 使用
 
+
 修改 helix 的语言配置文件 `languages.toml`， 修改下面文件任何一个即可
 
 - `$XDG_CONFIG_HOME/helix/languages.toml` helix 配置文件
 - `WORKSPACE_ROOT/.helix/languages.toml` 项目下配置文件
+
+> 关于 `WORKSPACE_ROOT`, 获取 helix 提供的 `initialize` 中 `rootPath`, 所以在存在多个 `.helix` 层级的时候读取的是最近的一个 root .
 
 比如为 markdown 追加支持。
 

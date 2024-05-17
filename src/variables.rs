@@ -1,8 +1,8 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::OnceLock};
 
 use aho_corasick::AhoCorasick;
 use rand::distributions::{Distribution, Uniform};
-use time::{format_description, OffsetDateTime};
+use time::{format_description, OffsetDateTime, UtcOffset};
 use uuid::Uuid;
 
 use crate::encoding::char_is_word;
@@ -277,16 +277,22 @@ impl Variables {
     }
 }
 
+// time local offset not support multi-thread
+static TIME_OFFSET: OnceLock<UtcOffset> = OnceLock::new();
+
+pub fn init_time_offset() {
+    let offset = OffsetDateTime::now_local()
+        .unwrap_or(OffsetDateTime::now_utc())
+        .offset();
+    let _ = TIME_OFFSET.set(offset);
+}
+
 fn time_format(s: &str) -> String {
     match format_description::parse(s) {
-        Ok(format) =>
-        // TODO FIX get error in unix
-        {
-            OffsetDateTime::now_local()
-                .unwrap_or(OffsetDateTime::now_utc())
-                .format(&format)
-                .unwrap_or(s.to_string())
-        }
+        Ok(format) => OffsetDateTime::now_utc()
+            .to_offset(*TIME_OFFSET.get().unwrap_or(&UtcOffset::UTC))
+            .format(&format)
+            .unwrap_or(s.to_string()),
         Err(_) => s.to_owned(),
     }
 }
@@ -313,9 +319,7 @@ fn random_hex() -> String {
 #[cfg(test)]
 mod test {
 
-    use crate::variables::{time_format, VariableInit};
-
-    use super::Variables;
+    use super::{VariableInit, Variables, TIME_OFFSET};
 
     #[test]
     fn test_convert() {

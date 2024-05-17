@@ -24,6 +24,8 @@ Modify the language configuration file `languages.toml` for Helix Editor.
 - `$XDG_CONFIG_HOME/helix/languages.toml`: Helix Configuration file.
 - `WORKSPACE_ROOT/.helix/languages.toml` : Configuration file under project workspace root.
 
+> About 'WORKSPACE_ROOT',  It is read the 'rootPath' from the 'initialize' provided by Helix, when there are multiple levels of rootPath(`language.roots` of languages.toml), It will read the closest of root '.helix'.
+
 Example, Add support for markdown.
 
 ```toml

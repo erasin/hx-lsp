@@ -62,6 +62,7 @@ pub struct Server {
 
 impl Server {
     pub fn new(params: &InitializeParams) -> Self {
+        // FIX: 文件夹中存在多个 .helix 的目录问题
         let mut root = std::env::current_dir().ok().unwrap();
         if let Some(ws) = params.workspace_folders.clone() {
             if !ws.is_empty() {
