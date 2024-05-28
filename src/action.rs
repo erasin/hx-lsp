@@ -2,10 +2,10 @@ use std::{
     collections::HashMap,
     path::PathBuf,
     process::{Command, Stdio},
+    sync::OnceLock,
 };
 
 use lsp_types::{CodeAction, Range};
-use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use regex::Regex;
 use ropey::Rope;
@@ -65,7 +65,10 @@ impl Action {
     }
 }
 
-static ACTIONS: Lazy<Mutex<HashMap<String, Actions>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+fn actions_list() -> &'static Mutex<HashMap<String, Actions>> {
+    static ACTIONS: OnceLock<Mutex<HashMap<String, Actions>>> = OnceLock::new();
+    ACTIONS.get_or_init(|| Mutex::new(HashMap::new()))
+}
 
 /// 语言包
 #[derive(Deserialize, Serialize, Clone, Debug)]
@@ -103,7 +106,7 @@ impl Actions {
         range: &Range,
         project_root: &PathBuf,
     ) -> Actions {
-        let mut actions_list = ACTIONS.lock();
+        let mut actions_list = actions_list().lock();
 
         let mut actions = match actions_list.get(&lang_name) {
             Some(has) => has.clone(),

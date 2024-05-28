@@ -2,9 +2,9 @@ use std::{collections::HashMap, path::PathBuf};
 
 use anyhow::Result;
 use lsp_types::{CompletionItem, CompletionItemKind};
-use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
+use std::sync::OnceLock;
 
 use crate::{
     errors::Error,
@@ -74,7 +74,10 @@ impl Snippet {
 }
 
 // TODO: watch file or restart lsp
-static SNIPPETS: Lazy<Mutex<HashMap<String, Snippets>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+fn snippets_list() -> &'static Mutex<HashMap<String, Snippets>> {
+    static SNIPPETS: OnceLock<Mutex<HashMap<String, Snippets>>> = OnceLock::new();
+    SNIPPETS.get_or_init(|| Mutex::new(HashMap::new()))
+}
 
 /// 语言包
 #[derive(Deserialize, Serialize, Clone, Debug)]
@@ -119,7 +122,7 @@ impl Snippets {
     pub fn get_global(project_root: &PathBuf) -> Snippets {
         let name = "global";
         // check have
-        let mut snippets = SNIPPETS.lock();
+        let mut snippets = snippets_list().lock();
         match snippets.get(name) {
             Some(has) => has.clone(),
             None => {
@@ -140,7 +143,7 @@ impl Snippets {
 
     /// 获取 XDG_CONFIG_HOME 下的 `langid.json` 语言文件
     pub fn get_lang(lang_name: String, project_root: &PathBuf) -> Snippets {
-        let mut snippets_list = SNIPPETS.lock();
+        let mut snippets_list = snippets_list().lock();
         match snippets_list.get(&lang_name) {
             Some(has) => has.clone(),
             None => {
