@@ -98,47 +98,51 @@ pub enum Variables {
     LineComment,
 }
 
-impl ToString for Variables {
-    fn to_string(&self) -> String {
-        match self {
-            Variables::TmSelectedText(_) => "TM_SELECTED_TEXT".to_owned(),
-            Variables::TmCurrentLine(_) => "TM_CURRENT_LINE".to_owned(),
-            Variables::TmCurrentWord(_) => "TM_CURRENT_WORD".to_owned(),
-            Variables::TmLineIndex(_) => "TM_LINE_INDEX".to_owned(),
-            Variables::TmLineNumber(_) => "TM_LINE_NUMBER".to_owned(),
-            Variables::TmFilename(_) => "TM_FILENAME".to_owned(),
-            Variables::TmFilenameBase(_) => "TM_FILENAME_BASE".to_owned(),
-            Variables::TmDirectory(_) => "TM_DIRECTORY".to_owned(),
-            Variables::TmFilepath(_) => "TM_FILEPATH".to_owned(),
-            Variables::RelativeFilepath(_) => "RELATIVE_FILEPATH".to_owned(),
-            Variables::Clipboard(_) => "CLIPBOARD".to_owned(),
-            Variables::WorkspaceName(_) => "WORKSPACE_NAME".to_owned(),
-            Variables::WorkspaceFolder(_) => "WORKSPACE_FOLDER".to_owned(),
-            Variables::CursorIndex => "CURSOR_INDEX".to_owned(),
-            Variables::CursorNumber => "CURSOR_NUMBER".to_owned(),
+impl std::fmt::Display for Variables {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Variables::TmSelectedText(_) => "TM_SELECTED_TEXT",
+                Variables::TmCurrentLine(_) => "TM_CURRENT_LINE",
+                Variables::TmCurrentWord(_) => "TM_CURRENT_WORD",
+                Variables::TmLineIndex(_) => "TM_LINE_INDEX",
+                Variables::TmLineNumber(_) => "TM_LINE_NUMBER",
+                Variables::TmFilename(_) => "TM_FILENAME",
+                Variables::TmFilenameBase(_) => "TM_FILENAME_BASE",
+                Variables::TmDirectory(_) => "TM_DIRECTORY",
+                Variables::TmFilepath(_) => "TM_FILEPATH",
+                Variables::RelativeFilepath(_) => "RELATIVE_FILEPATH",
+                Variables::Clipboard(_) => "CLIPBOARD",
+                Variables::WorkspaceName(_) => "WORKSPACE_NAME",
+                Variables::WorkspaceFolder(_) => "WORKSPACE_FOLDER",
+                Variables::CursorIndex => "CURSOR_INDEX",
+                Variables::CursorNumber => "CURSOR_NUMBER",
 
-            Variables::CurrentYear => "CURRENT_YEAR".to_owned(),
-            Variables::CurrentYearShort => "CURRENT_YEAR_SHORT".to_owned(),
-            Variables::CurrentMonth => "CURRENT_MONTH".to_owned(),
-            Variables::CurrentMonthName => "CURRENT_MONTH_NAME".to_owned(),
-            Variables::CurrentMonthNameShort => "CURRENT_MONTH_NAME_SHORT".to_owned(),
-            Variables::CurrentDate => "CURRENT_DATE".to_owned(),
-            Variables::CurrentDayName => "CURRENT_DAY_NAME".to_owned(),
-            Variables::CurrentDayNameShort => "CURRENT_DAY_NAME_SHORT".to_owned(),
-            Variables::CurrentHour => "CURRENT_HOUR".to_owned(),
-            Variables::CurrentMinute => "CURRENT_MINUTE".to_owned(),
-            Variables::CurrentSecond => "CURRENT_SECOND".to_owned(),
-            Variables::CurrentSecondsUnix => "CURRENT_SECONDS_UNIX".to_owned(),
-            Variables::CurrentTimezoneOffset => "CURRENT_TIMEZONE_OFFSET".to_owned(),
+                Variables::CurrentYear => "CURRENT_YEAR",
+                Variables::CurrentYearShort => "CURRENT_YEAR_SHORT",
+                Variables::CurrentMonth => "CURRENT_MONTH",
+                Variables::CurrentMonthName => "CURRENT_MONTH_NAME",
+                Variables::CurrentMonthNameShort => "CURRENT_MONTH_NAME_SHORT",
+                Variables::CurrentDate => "CURRENT_DATE",
+                Variables::CurrentDayName => "CURRENT_DAY_NAME",
+                Variables::CurrentDayNameShort => "CURRENT_DAY_NAME_SHORT",
+                Variables::CurrentHour => "CURRENT_HOUR",
+                Variables::CurrentMinute => "CURRENT_MINUTE",
+                Variables::CurrentSecond => "CURRENT_SECOND",
+                Variables::CurrentSecondsUnix => "CURRENT_SECONDS_UNIX",
+                Variables::CurrentTimezoneOffset => "CURRENT_TIMEZONE_OFFSET",
 
-            Variables::Random => "RANDOM".to_owned(),
-            Variables::RandomHex => "RANDOM_HEX".to_owned(),
-            Variables::Uuid => "UUID".to_owned(),
+                Variables::Random => "RANDOM",
+                Variables::RandomHex => "RANDOM_HEX",
+                Variables::Uuid => "UUID",
 
-            Variables::BlockCommentStart => "BLOCK_COMMENT_START".to_owned(),
-            Variables::BlockCommentEnd => "BLOCK_COMMENT_END".to_owned(),
-            Variables::LineComment => "LINE_COMMENT".to_owned(),
-        }
+                Variables::BlockCommentStart => "BLOCK_COMMENT_START",
+                Variables::BlockCommentEnd => "BLOCK_COMMENT_END",
+                Variables::LineComment => "LINE_COMMENT",
+            }
+        )
     }
 }
 
@@ -277,24 +281,31 @@ impl Variables {
     }
 }
 
-// time local offset not support multi-thread
-static TIME_OFFSET: OnceLock<UtcOffset> = OnceLock::new();
+pub fn get_time_offset() -> &'static UtcOffset {
+    // time local offset not support multi-thread
+    static TIME_OFFSET: OnceLock<UtcOffset> = OnceLock::new();
 
-pub fn init_time_offset() {
-    let offset = OffsetDateTime::now_local()
-        .unwrap_or(OffsetDateTime::now_utc())
-        .offset();
-    let _ = TIME_OFFSET.set(offset);
+    TIME_OFFSET.get_or_init(|| {
+        OffsetDateTime::now_local()
+            .unwrap_or(OffsetDateTime::now_utc())
+            .offset()
+    })
+}
+pub fn time_format(s: &str) -> String {
+    match time_format_parse(s) {
+        Ok(s) => s,
+        Err(_e) => s.to_owned(),
+    }
 }
 
-fn time_format(s: &str) -> String {
-    match format_description::parse(s) {
-        Ok(format) => OffsetDateTime::now_utc()
-            .to_offset(*TIME_OFFSET.get().unwrap_or(&UtcOffset::UTC))
-            .format(&format)
-            .unwrap_or(s.to_string()),
-        Err(_) => s.to_owned(),
-    }
+pub fn time_format_parse(s: &str) -> Result<String, Box<dyn std::error::Error>> {
+    let format = format_description::parse(s)?;
+
+    let s = OffsetDateTime::now_utc()
+        .to_offset(*get_time_offset())
+        .format(&format)?;
+
+    Ok(s)
 }
 
 fn random() -> String {
@@ -319,7 +330,7 @@ fn random_hex() -> String {
 #[cfg(test)]
 mod test {
 
-    use super::{VariableInit, Variables, TIME_OFFSET};
+    use super::{VariableInit, Variables};
 
     #[test]
     fn test_convert() {

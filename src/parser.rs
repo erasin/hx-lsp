@@ -46,13 +46,16 @@ pub enum StrOrSeq {
     Array(Vec<String>),
 }
 
-impl ToString for StrOrSeq {
-    /// `Vec<String>` 使用 `\n` 组合为 String
-    fn to_string(&self) -> String {
-        match self {
-            StrOrSeq::String(s) => s.clone(),
-            StrOrSeq::Array(v) => v.join("\n").clone(),
-        }
+impl std::fmt::Display for StrOrSeq {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                StrOrSeq::String(s) => s.clone(),
+                StrOrSeq::Array(v) => v.join("\n").clone(),
+            }
+        )
     }
 }
 

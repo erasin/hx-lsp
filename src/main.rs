@@ -4,7 +4,7 @@ use lsp_server::Connection;
 use hx_lsp::{
     errors::Error,
     lsp::{server_capabilities, Server},
-    variables::init_time_offset,
+    variables::get_time_offset,
 };
 use lsp_types::InitializeParams;
 
@@ -23,7 +23,7 @@ fn main() -> Result<(), Error> {
                 .start()?;
         }
     }
-    init_time_offset();
+    let _ = get_time_offset();
     run_lsp_server()
 }
 

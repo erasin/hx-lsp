@@ -14,12 +14,16 @@ pub enum Dirs {
     Actions,
 }
 
-impl ToString for Dirs {
-    fn to_string(&self) -> String {
-        match &self {
-            Dirs::Snippets => "snippets".to_owned(),
-            Dirs::Actions => "actions".to_owned(),
-        }
+impl std::fmt::Display for Dirs {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match &self {
+                Dirs::Snippets => "snippets",
+                Dirs::Actions => "actions",
+            }
+        )
     }
 }
 
