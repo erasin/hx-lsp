@@ -291,6 +291,7 @@ pub fn get_time_offset() -> &'static UtcOffset {
             .offset()
     })
 }
+
 pub fn time_format(s: &str) -> String {
     match time_format_parse(s) {
         Ok(s) => s,

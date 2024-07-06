@@ -152,29 +152,24 @@ pub mod provider {
 
     #[cfg(feature = "term")]
     mod osc52 {
-        use {super::ClipboardType, crate::base64};
+        use crate::base64;
 
         #[derive(Debug)]
         pub struct SetClipboardCommand {
             encoded_content: String,
-            clipboard_type: ClipboardType,
         }
 
         impl SetClipboardCommand {
-            pub fn new(content: &str, clipboard_type: ClipboardType) -> Self {
+            pub fn new(content: &str) -> Self {
                 Self {
                     encoded_content: base64::encode(content.as_bytes()),
-                    clipboard_type,
                 }
             }
         }
 
         impl crossterm::Command for SetClipboardCommand {
             fn write_ansi(&self, f: &mut impl std::fmt::Write) -> std::fmt::Result {
-                let kind = match &self.clipboard_type {
-                    ClipboardType::Clipboard => "c",
-                    ClipboardType::Selection => "p",
-                };
+                let kind = "c";
                 // Send an OSC 52 set command: https://terminalguide.namepad.de/seq/osc-52/
                 write!(f, "\x1b]52;{};{}\x1b\\", kind, &self.encoded_content)
             }
@@ -342,7 +337,7 @@ pub mod provider {
 
 #[cfg(target_os = "windows")]
 mod provider {
-    use super::{ClipboardProvider, ClipboardType};
+    use super::ClipboardProvider;
     use anyhow::Result;
     use std::borrow::Cow;
 
