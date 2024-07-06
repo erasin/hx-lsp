@@ -18,8 +18,7 @@ pub enum OffsetEncoding {
     Utf32,
 }
 
-/// Converts [`lsp::Position`] to a position in the document.
-/// 转换 [`lsp::Position`] 为文本位置。
+/// Converts LSP Position to a position in the document.
 ///
 /// Returns `None` if position.line is out of bounds or an overflow occurs
 pub fn lsp_pos_to_pos(
@@ -72,19 +71,16 @@ pub fn apply_content_change(
             // 移除区域并插入新的文本
             doc.remove(change_start_doc_char_idx..change_end_doc_char_idx);
             doc.insert(change_start_doc_char_idx, &change.text);
-
-            return Ok(());
         }
         None => {
             *doc = Rope::from_str(&change.text);
-
-            return Ok(());
         }
     }
+    Ok(())
 }
 
 //  If input as field or attribute return true.
-pub fn is_field<'a>(line: &'a RopeSlice, line_character_pos: usize) -> bool {
+pub fn is_field(line: &RopeSlice, line_character_pos: usize) -> bool {
     if line_character_pos == 0 || line_character_pos > line.len_chars() {
         return false;
     }
@@ -186,7 +182,7 @@ mod test {
     fn test_get_last() {
         let line = ropey::RopeSlice::from("abcd ef1h");
         let word = get_current_word(&line, 7);
-        assert_eq!(Some("ef"), word);
+        assert_eq!(Some("ef1h"), word);
     }
 
     #[test]

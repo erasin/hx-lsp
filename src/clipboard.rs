@@ -322,10 +322,9 @@ pub mod provider {
             }
 
             fn get_contents(&self) -> Result<String> {
-                Ok(self
-                    .get_cmd
+                self.get_cmd
                     .execute(None, true)?
-                    .context("output is missing")?)
+                    .context("output is missing")
             }
 
             fn set_contents(&mut self, value: String) -> Result<()> {

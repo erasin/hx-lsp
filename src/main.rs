@@ -33,7 +33,7 @@ fn run_lsp_server() -> Result<(), Error> {
     let (connection, io_threads) = Connection::stdio();
 
     let server_capabilities =
-        serde_json::to_value(&server_capabilities()).expect("Must be serializable");
+        serde_json::to_value(server_capabilities()).expect("Must be serializable");
 
     let initialization_params = match connection.initialize(server_capabilities) {
         Ok(it) => it,

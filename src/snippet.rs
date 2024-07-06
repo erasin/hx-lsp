@@ -1,4 +1,7 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 use anyhow::Result;
 use lsp_types::{CompletionItem, CompletionItemKind};
@@ -21,12 +24,12 @@ use crate::{
 /// ```json
 /// {
 /// "Print to console": {
-/// 	"prefix": "log",
-/// 	"body": [
-/// 		"console.log('$1');",
-/// 		"$2"
-/// 	],
-/// 	"description": "Log output to console"
+///    "prefix": "log",
+///    "body": [
+///       "console.log('$1');",
+///       "$2"
+///    ],
+///    "description": "Log output to console"
 /// }
 /// }
 /// ```
@@ -51,14 +54,11 @@ impl Snippet {
         let body = Variables::convert_all(&body, variable_init);
 
         match &self.prefix {
-            StrOrSeq::String(s) => [to_completion_item(
-                s.to_owned(),
-                body.to_owned(),
-                self.description(),
-            )]
-            .to_vec(),
+            StrOrSeq::String(s) => {
+                [to_completion_item(s.to_owned(), body, self.description())].to_vec()
+            }
             StrOrSeq::Array(arr) => arr
-                .into_iter()
+                .iter()
                 .map(|s| to_completion_item(s.to_owned(), body.to_owned(), self.description()))
                 .collect(),
         }
@@ -119,7 +119,7 @@ impl Snippets {
     /// # Errors
     ///
     /// This function will return an error if .
-    pub fn get_global(project_root: &PathBuf) -> Snippets {
+    pub fn get_global(project_root: &Path) -> Snippets {
         let name = "global";
         // check have
         let mut snippets = snippets_list().lock();
@@ -142,7 +142,7 @@ impl Snippets {
     }
 
     /// 获取 XDG_CONFIG_HOME 下的 `langid.json` 语言文件
-    pub fn get_lang(lang_name: String, project_root: &PathBuf) -> Snippets {
+    pub fn get_lang(lang_name: String, project_root: &Path) -> Snippets {
         let mut snippets_list = snippets_list().lock();
         match snippets_list.get(&lang_name) {
             Some(has) => has.clone(),
@@ -174,10 +174,10 @@ impl Snippets {
     /// 转换 snippets 为 lsp 的提示类型
     pub fn to_completion_items(&self, variable_init: &VariableInit) -> Vec<CompletionItem> {
         self.snippets
-            .iter()
-            .map(|(_name, snippet)| snippet.to_completion_item(variable_init))
+            .values()
+            .map(|snippet| snippet.to_completion_item(variable_init))
             .fold(Vec::<CompletionItem>::new(), |mut a, b| {
-                a.extend(b.into_iter());
+                a.extend(b);
                 a
             })
     }
@@ -209,13 +209,10 @@ fn from_files(name: String, files: Vec<PathBuf>) -> Snippets {
         .filter_map(|p| {
             parse::<Snippets>(&p, p.file_stem().unwrap().to_string_lossy().into_owned()).ok()
         })
-        .fold(
-            Snippets::new(name.to_owned(), HashMap::new()),
-            |mut acc, map| {
-                acc.extend(map);
-                acc
-            },
-        )
+        .fold(Snippets::new(name, HashMap::new()), |mut acc, map| {
+            acc.extend(map);
+            acc
+        })
 }
 
 /// 读取文件夹内容，获取全局 `*.code-snippets` 文件路径
@@ -226,7 +223,7 @@ fn read_names(path: &PathBuf) -> Vec<PathBuf> {
                 .filter_map(|entry| {
                     let entry = entry.ok()?;
                     let path = entry.path();
-                    (path.extension()? == "code-snippets").then(|| path)
+                    (path.extension()? == "code-snippets").then_some(path)
                 })
                 .collect()
         })
@@ -243,7 +240,8 @@ mod test {
         let root = std::env::current_dir().ok().unwrap();
         let lang = Snippets::get_lang("markdown".to_owned(), &root);
 
+        println!("{:?}", lang);
         assert_eq!(lang.name, "markdown".to_owned(),);
-        assert!(lang.snippets.get("time").is_some());
+        assert!(lang.snippets.contains_key("markdown a"));
     }
 }

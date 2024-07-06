@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::{Command, Stdio},
     sync::OnceLock,
 };
@@ -100,12 +100,7 @@ impl Actions {
         Actions { name, actions }
     }
 
-    pub fn get_lang(
-        lang_name: String,
-        doc: &Rope,
-        range: &Range,
-        project_root: &PathBuf,
-    ) -> Actions {
+    pub fn get_lang(lang_name: String, doc: &Rope, range: &Range, project_root: &Path) -> Actions {
         let mut actions_list = actions_list().lock();
 
         let mut actions = match actions_list.get(&lang_name) {
@@ -160,8 +155,7 @@ impl Actions {
                 log::trace!("{action:?}");
 
                 let re = Regex::new(&action.catch);
-                if re.is_ok() {
-                    let re = re.unwrap();
+                if let Ok(re) = re {
                     if re.is_match(&line.to_string()) {
                         return Some((name, action));
                     }

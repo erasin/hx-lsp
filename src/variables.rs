@@ -148,8 +148,8 @@ impl std::fmt::Display for Variables {
 
 impl Variables {
     /// 转换字符串内的变量
-    pub fn convert_all(text: &String, init: &VariableInit) -> String {
-        let mut text = text.clone();
+    pub fn convert_all(text: &str, init: &VariableInit) -> String {
+        let mut text = text.to_owned();
         Variables::to_vec(init)
             .into_iter()
             .for_each(|f| text = f.convert(&text));
@@ -170,7 +170,7 @@ impl Variables {
             Variables::TmDirectory(init.file_path.clone()),
             Variables::TmFilepath(init.file_path.clone()),
             Variables::RelativeFilepath(init.file_path.clone()),
-            Variables::Clipboard(init.clipboard.clone().unwrap_or(Default::default())),
+            Variables::Clipboard(init.clipboard.clone().unwrap_or_default()),
             Variables::WorkspaceName(init.work_path.clone()),
             Variables::WorkspaceFolder(init.work_path.clone()),
             Variables::CursorIndex,
@@ -271,13 +271,11 @@ impl Variables {
 
         let ac = AhoCorasick::builder()
             .ascii_case_insensitive(true)
-            .build(patterns.into_iter())
+            .build(patterns)
             .unwrap();
 
-        let re = ac
-            .try_replace_all(text, replace_with)
-            .unwrap_or(text.to_owned());
-        re
+        ac.try_replace_all(text, replace_with)
+            .unwrap_or(text.to_owned())
     }
 }
 
@@ -349,8 +347,8 @@ mod test {
 
         let mut vars = VariableInit::default();
         let root = std::env::current_dir().ok().unwrap();
-        vars.file_path = root.clone();
-        vars.work_path = root.clone();
+        vars.file_path.clone_from(&root);
+        vars.work_path.clone_from(&root);
 
         let re = Variables::convert_all(&text, &vars);
 

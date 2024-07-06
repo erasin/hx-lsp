@@ -252,11 +252,7 @@ impl Server {
     ) -> Option<Vec<lsp_types::CompletionItem>> {
         let uri = params.text_document_position.text_document.uri.path();
         let pos = params.text_document_position.position;
-        let lang_id = if let Some(lang_id) = self.lang_id.get(uri) {
-            lang_id
-        } else {
-            return None;
-        };
+        let lang_id = self.lang_id.get(uri)?;
 
         let snippets = [
             Snippets::get_lang(lang_id.clone(), &self.root),
@@ -271,7 +267,7 @@ impl Server {
         let doc_lock = self.lang_doc.lock();
         let doc = doc_lock
             .get(uri)
-            .expect(format!("unknown cachefile of {uri}").as_str());
+            .unwrap_or_else(|| panic!("unknown cachefile of {uri}"));
         let line = doc.get_line(pos.line as usize)?;
 
         if is_field(&line, pos.character as usize) {
@@ -313,13 +309,13 @@ impl Server {
         let doc = doc_lock.get(uri)?;
 
         let line = doc.get_line(params.range.end.line as usize)?;
-        let cursor_word = get_current_word(&line, params.range.end.character as usize)
-            .unwrap_or(Default::default());
+        let cursor_word =
+            get_current_word(&line, params.range.end.character as usize).unwrap_or_default();
 
         let actions = Actions::get_lang(lang_id.clone(), doc, &params.range, &self.root);
 
         let range_content =
-            get_range_content(&doc, &params.range, OffsetEncoding::Utf8).unwrap_or("".into());
+            get_range_content(doc, &params.range, OffsetEncoding::Utf8).unwrap_or("".into());
 
         let variable_init = VariableInit {
             file_path: params.text_document.uri.to_file_path().unwrap(),

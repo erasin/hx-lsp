@@ -32,7 +32,7 @@ where
     };
 
     let mut p: T = Default::default();
-    p.set_name(name.into());
+    p.set_name(name);
     p.set_hasmap(hs);
 
     Ok(p)
@@ -53,7 +53,7 @@ impl std::fmt::Display for StrOrSeq {
             "{}",
             match self {
                 StrOrSeq::String(s) => s.clone(),
-                StrOrSeq::Array(v) => v.join("\n").clone(),
+                StrOrSeq::Array(v) => v.join("\n"),
             }
         )
     }
@@ -64,7 +64,7 @@ impl StrOrSeq {
     pub fn first(&self) -> Option<String> {
         match self {
             StrOrSeq::String(s) => Some(s.clone()),
-            StrOrSeq::Array(v) => v.first().and_then(|s| Some(s.clone())),
+            StrOrSeq::Array(v) => v.first().cloned(),
         }
     }
 }
