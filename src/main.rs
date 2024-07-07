@@ -2,13 +2,13 @@ use flexi_logger::{FileSpec, Logger, WriteMode};
 use lsp_server::Connection;
 
 use hx_lsp::{
-    errors::Error,
     lsp::{server_capabilities, Server},
     variables::get_time_offset,
+    Result,
 };
 use lsp_types::InitializeParams;
 
-fn main() -> Result<(), Error> {
+fn main() -> Result<()> {
     if let Some(arg) = std::env::args().nth(1) {
         if arg.eq("--version") {
             let version = env!("CARGO_PKG_VERSION");
@@ -27,7 +27,7 @@ fn main() -> Result<(), Error> {
     run_lsp_server()
 }
 
-fn run_lsp_server() -> Result<(), Error> {
+fn run_lsp_server() -> Result<()> {
     log::info!("hx-lsp: server up");
 
     let (connection, io_threads) = Connection::stdio();

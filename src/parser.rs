@@ -3,7 +3,7 @@ use std::{collections::HashMap, fs::File, io::BufReader, path::PathBuf};
 use json_comments::StripComments;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-use crate::errors::Error;
+use crate::Result;
 
 pub trait Parser {
     type Item: DeserializeOwned + Clone;
@@ -12,7 +12,7 @@ pub trait Parser {
 }
 
 /// 解析 `code-snippets json` 文件
-pub fn parse<T>(lang_file_path: &PathBuf, name: String) -> Result<T, Error>
+pub fn parse<T>(lang_file_path: &PathBuf, name: String) -> Result<T>
 where
     T: Parser + DeserializeOwned + Serialize + Clone + Default,
 {

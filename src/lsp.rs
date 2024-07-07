@@ -17,6 +17,7 @@ use ropey::Rope;
 use crate::{
     action::{shell_exec, Actions},
     encoding::{get_current_word, is_field},
+    Result,
 };
 use crate::{clipboard::get_clipboard_provider, snippet::Snippets};
 use crate::{encoding::get_range_content, errors::Error};
@@ -78,7 +79,7 @@ impl Server {
         }
     }
 
-    pub fn listen(&mut self, connection: &Connection) -> Result<(), Error> {
+    pub fn listen(&mut self, connection: &Connection) -> Result<()> {
         log::info!("starting example main loop");
 
         while let Ok(msg) = connection.receiver.recv() {
@@ -107,10 +108,7 @@ impl Server {
     }
 
     /// lsp 请求处理
-    fn handle_request(
-        &mut self,
-        request: lsp_server::Request,
-    ) -> Result<lsp_server::Response, Error> {
+    fn handle_request(&mut self, request: lsp_server::Request) -> Result<lsp_server::Response> {
         let id = request.id.clone();
 
         match request.method.as_str() {
@@ -153,9 +151,10 @@ impl Server {
 
             // DocumentDiagnosticRequest::METHOD
             // WorkspaceDiagnosticRequest::METHOD
-            unsupported => Err(Error::UnsupportedLspRequest {
+            unsupported => Error::UnsupportedLspRequest {
                 request: unsupported.to_string(),
-            }),
+            }
+            .into(),
         }
 
         // match cast_request::<Completion>(request) {
@@ -167,7 +166,7 @@ impl Server {
     }
 
     /// lsp 提示处理
-    fn handle_notification(&mut self, notification: lsp_server::Notification) -> Result<(), Error> {
+    fn handle_notification(&mut self, notification: lsp_server::Notification) -> Result<()> {
         match notification.method.as_str() {
             Exit::METHOD => {
                 // exit
@@ -188,7 +187,7 @@ impl Server {
                     .insert(uri.to_string(), params.text_document.language_id);
                 self.lang_doc.lock().insert(uri.to_string(), doc);
 
-                Ok::<(), Error>(())
+                Ok(())
             }
 
             // 文件关闭
@@ -239,9 +238,10 @@ impl Server {
                 Ok(())
             }
 
-            unsupported => Err(Error::UnsupportedLspRequest {
+            unsupported => Error::UnsupportedLspRequest {
                 request: unsupported.to_string(),
-            }),
+            }
+            .into(),
         }
     }
 
@@ -330,7 +330,7 @@ impl Server {
         Some(actions.to_code_action_items(&variable_init))
     }
 
-    fn action_resolve(&self, action: &CodeAction) -> Result<CodeAction, Error> {
+    fn action_resolve(&self, action: &CodeAction) -> Result<CodeAction> {
         let cmd = action.clone().command.expect("unknow cmd");
 
         shell_exec(cmd.command.as_str())?;
@@ -345,7 +345,7 @@ impl Server {
 }
 
 /// 获取 request 参数
-fn cast_request<R>(request: lsp_server::Request) -> Result<R::Params, Error>
+fn cast_request<R>(request: lsp_server::Request) -> Result<R::Params>
 where
     R: lsp_types::request::Request,
     R::Params: serde::de::DeserializeOwned,
@@ -355,7 +355,7 @@ where
 }
 
 /// 获取 notification 参数
-fn cast_notification<N>(notification: lsp_server::Notification) -> Result<N::Params, Error>
+fn cast_notification<N>(notification: lsp_server::Notification) -> Result<N::Params>
 where
     N: lsp_types::notification::Notification,
     N::Params: serde::de::DeserializeOwned,

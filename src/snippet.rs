@@ -3,18 +3,17 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::Result;
 use lsp_types::{CompletionItem, CompletionItemKind};
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use std::sync::OnceLock;
 
 use crate::{
-    errors::Error,
     fuzzy::fuzzy_match,
     loader::{config_dir, Dirs},
     parser::{parse, Parser, StrOrSeq},
     variables::{VariableInit, Variables},
+    Result,
 };
 
 /// 代码片段
@@ -182,7 +181,7 @@ impl Snippets {
             })
     }
 
-    pub fn filter(&self, word: &str) -> Result<Snippets, Error> {
+    pub fn filter(&self, word: &str) -> Result<Snippets> {
         let names: HashMap<String, String> = self
             .clone()
             .snippets

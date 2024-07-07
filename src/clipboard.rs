@@ -2,7 +2,7 @@
 
 // Implementation reference: https://github.com/neovim/neovim/blob/f2906a4669a2eef6d7bf86a29648793d63c98949/runtime/autoload/provider/clipboard.vim#L68-L152
 
-use anyhow::Result;
+use crate::Result;
 use std::borrow::Cow;
 
 pub trait ClipboardProvider: std::fmt::Debug {
@@ -147,7 +147,7 @@ pub fn get_clipboard_provider() -> Box<dyn ClipboardProvider> {
 #[cfg(not(target_os = "windows"))]
 pub mod provider {
     use super::ClipboardProvider;
-    use anyhow::Result;
+    use crate::Result;
     use std::borrow::Cow;
 
     #[cfg(feature = "term")]
@@ -234,7 +234,9 @@ pub mod provider {
     #[cfg(not(target_arch = "wasm32"))]
     pub mod command {
         use super::*;
-        use anyhow::{bail, Context as _};
+
+        use crate::errors::Error;
+        use crate::Result;
 
         #[cfg(not(any(windows, target_os = "macos")))]
         pub fn is_exit_success(program: &str, args: &[&str]) -> bool {
@@ -283,17 +285,14 @@ pub mod provider {
                 let mut child = command_mut.spawn()?;
 
                 if let Some(input) = input {
-                    let mut stdin = child.stdin.take().context("stdin is missing")?;
-                    stdin
-                        .write_all(input.as_bytes())
-                        .context("couldn't write in stdin")?;
+                    let mut stdin = child.stdin.take().ok_or(Error::ClipboardMissStdin)?;
+                    stdin.write_all(input.as_bytes())?;
                 }
 
-                // TODO: add timer?
                 let output = child.wait_with_output()?;
 
                 if !output.status.success() {
-                    bail!("clipboard provider {} failed", self.prg);
+                    return Error::ClipboardFail(self.prg).into();
                 }
 
                 if pipe_output {
@@ -324,7 +323,7 @@ pub mod provider {
             fn get_contents(&self) -> Result<String> {
                 self.get_cmd
                     .execute(None, true)?
-                    .context("output is missing")
+                    .ok_or(Error::ClipboardMissStdout.into())
             }
 
             fn set_contents(&mut self, value: String) -> Result<()> {
@@ -337,7 +336,7 @@ pub mod provider {
 #[cfg(target_os = "windows")]
 mod provider {
     use super::ClipboardProvider;
-    use anyhow::Result;
+    use crate::Result;
     use std::borrow::Cow;
 
     #[derive(Default, Debug)]

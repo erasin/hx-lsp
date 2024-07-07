@@ -12,10 +12,10 @@ use ropey::Rope;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    errors::Error,
     loader::{config_dir, Dirs},
     parser::{parse, Parser, StrOrSeq},
     variables::{VariableInit, Variables},
+    Result,
 };
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
@@ -192,7 +192,7 @@ fn from_files(name: String, files: Vec<PathBuf>) -> Actions {
 }
 
 /// 执行
-pub fn shell_exec(cmd: &str) -> Result<(), Error> {
+pub fn shell_exec(cmd: &str) -> Result<()> {
     let shell = if cfg!(windows) {
         vec!["cmd".to_owned(), "/C".to_owned()]
     } else {
