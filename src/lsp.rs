@@ -296,7 +296,7 @@ impl Server {
             line_text: line.to_string(),
             current_word: cursor_word,
             selected_text: Default::default(),
-            clipboard: get_clipboard_provider().get_contents().ok(),
+            clipboard: None, // get_clipboard_provider().get_contents().ok(),
         };
 
         Some(snippets.to_completion_items(&variable_init))
@@ -324,7 +324,7 @@ impl Server {
             line_text: line.to_string(),
             current_word: cursor_word.to_string(),
             selected_text: range_content.to_string(),
-            clipboard: get_clipboard_provider().get_contents().ok(),
+            clipboard: None, // get_clipboard_provider().get_contents().ok(),
         };
 
         Some(actions.to_code_action_items(&variable_init))

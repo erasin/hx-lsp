@@ -202,7 +202,7 @@ snippet 格式：
 - [x] `TM_DIRECTORY`
 - [x] `TM_FILEPATH`
 - [x] `RELATIVE_FILEPATH`
-- [x] `CLIPBOARD`
+- [ ] `CLIPBOARD`
 - [x] `WORKSPACE_NAME`
 - [x] `WORKSPACE_FOLDER`
 
