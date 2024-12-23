@@ -25,6 +25,7 @@ use url::Url;
 
 use crate::{
     action::{shell_exec, Actions},
+    colors::{extract_colors, parse_color},
     encoding::{get_current_word, is_field},
     state::State,
 };

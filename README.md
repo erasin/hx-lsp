@@ -8,6 +8,7 @@ An LSP tool that provides custom code snippets and Code Actions for [Helix Edito
 
 - Completion: snippets
 - CodeAction: actions
+- Document Color
 
 ## Install
 

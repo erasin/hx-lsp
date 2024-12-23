@@ -376,7 +376,7 @@ dependencies = [
 
 [[package]]
 name = "hx-lsp"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "aho-corasick",
  "async-lsp",
