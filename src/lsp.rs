@@ -6,16 +6,22 @@ use lsp_types::{
         DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, DidSaveTextDocument,
         Exit, Notification,
     },
-    request::{CodeActionRequest, CodeActionResolveRequest, Completion, Request},
-    CodeAction, CodeActionOptions, CodeActionProviderCapability, CompletionOptions,
-    InitializeParams, SaveOptions, ServerCapabilities, TextDocumentSyncCapability,
-    TextDocumentSyncKind, TextDocumentSyncOptions, TextDocumentSyncSaveOptions,
+    request::{
+        CodeActionRequest, CodeActionResolveRequest, ColorPresentationRequest, Completion,
+        DocumentColor, Request,
+    },
+    CodeAction, CodeActionOptions, CodeActionProviderCapability, ColorInformation,
+    ColorPresentationParams, ColorProviderCapability, CompletionOptions, DocumentChanges,
+    DocumentColorParams, InitializeParams, Position, Range, SaveOptions, ServerCapabilities,
+    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
+    TextDocumentSyncSaveOptions,
 };
 use parking_lot::Mutex;
 use ropey::Rope;
 
 use crate::{
     action::{shell_exec, Actions},
+    colors::{extract_colors, parse_color},
     encoding::{get_current_word, is_field},
     Result,
 };
@@ -46,37 +52,68 @@ pub fn server_capabilities() -> ServerCapabilities {
                 })),
             },
         )),
+        color_provider: Some(ColorProviderCapability::Simple(true)),
         // workspace: Some(WorkspaceServerCapabilities { }),
         ..Default::default()
     }
 }
 
+#[derive(Default)]
 pub struct Server {
     root: PathBuf,
     // config: Config
     lang_id: HashMap<String, String>,
     lang_doc: Arc<Mutex<HashMap<String, Rope>>>,
     // snippets
-    #[allow(dead_code)]
-    params: InitializeParams,
+    // #[allow(dead_code)]
+    // params: InitializeParams,
 }
 
 impl Server {
-    pub fn new(params: &InitializeParams) -> Self {
-        // FIX: 文件夹中存在多个 .helix 的目录问题
-        let mut root = std::env::current_dir().ok().unwrap();
-        if let Some(ws) = params.workspace_folders.clone() {
-            if !ws.is_empty() {
-                root = ws.first().unwrap().uri.to_file_path().unwrap();
-            }
-        };
-
+    pub fn new() -> Self {
+        let root = std::env::current_dir().ok().unwrap();
         Server {
             root,
             lang_id: HashMap::new(),
             lang_doc: Arc::new(Mutex::new(HashMap::new())),
-            params: params.clone(),
+            // params: params.clone(),
         }
+    }
+
+    pub fn run(&mut self) -> Result<()> {
+        log::info!("hx-lsp: server up");
+
+        let (connection, io_threads) = Connection::stdio();
+
+        let server_capabilities =
+            serde_json::to_value(server_capabilities()).expect("Must be serializable");
+
+        let initialization_params = match connection.initialize(server_capabilities) {
+            Ok(it) => it,
+            Err(e) => {
+                if e.channel_is_disconnected() {
+                    io_threads.join()?;
+                }
+                return Err(e.into());
+            }
+        };
+        let initialization_params: InitializeParams =
+            serde_json::from_value(initialization_params)?;
+
+        // FIX: 文件夹中存在多个 .helix 的目录问题
+        if let Some(ws) = initialization_params.workspace_folders.clone() {
+            if !ws.is_empty() {
+                self.root = ws.first().unwrap().uri.to_file_path().unwrap();
+            }
+        };
+
+        self.listen(&connection)?;
+        io_threads.join()?;
+
+        // Shut down gracefully.
+        log::info!("hx-lsp: Shutting down server");
+
+        Ok(())
     }
 
     pub fn listen(&mut self, connection: &Connection) -> Result<()> {
@@ -149,6 +186,17 @@ impl Server {
                 })
             }
 
+            DocumentColor::METHOD => {
+                let params =
+                    cast_request::<DocumentColor>(request).expect("cast code action request");
+                let colors = self.document_color(&params);
+
+                Ok(lsp_server::Response {
+                    id,
+                    error: None,
+                    result: Some(serde_json::to_value(colors)?),
+                })
+            }
             // DocumentDiagnosticRequest::METHOD
             // WorkspaceDiagnosticRequest::METHOD
             unsupported => Error::UnsupportedLspRequest {
@@ -341,6 +389,15 @@ impl Server {
         resolved_action.command = None;
 
         Ok(resolved_action)
+    }
+
+    fn document_color(&self, params: &DocumentColorParams) -> Option<Vec<ColorInformation>> {
+        let uri = params.text_document.uri.path();
+        // let lang_id = self.lang_id.get(uri)?;
+        let doc_lock = self.lang_doc.lock();
+        let doc = doc_lock.get(uri)?;
+        let colors = extract_colors(doc);
+        Some(colors)
     }
 }
 
