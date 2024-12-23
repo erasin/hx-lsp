@@ -4,6 +4,7 @@
 
 use crate::Result;
 use std::borrow::Cow;
+use tracing as log;
 
 pub trait ClipboardProvider: std::fmt::Debug {
     fn name(&self) -> Cow<str>;
@@ -146,6 +147,8 @@ pub fn get_clipboard_provider() -> Box<dyn ClipboardProvider> {
 
 #[cfg(not(target_os = "windows"))]
 pub mod provider {
+    use tracing::{debug, warn};
+
     use super::ClipboardProvider;
     use crate::Result;
     use std::borrow::Cow;
@@ -184,11 +187,11 @@ pub mod provider {
     impl FallbackProvider {
         pub fn new() -> Self {
             #[cfg(feature = "term")]
-            log::debug!(
+            debug!(
                 "No native clipboard provider found. Yanking by OSC 52 and pasting will be internal to Helix"
             );
             #[cfg(not(feature = "term"))]
-            log::warn!(
+            warn!(
                 "No native clipboard provider found! Yanking and pasting will be internal to Helix"
             );
             Self { buf: String::new() }

@@ -1,23 +1,32 @@
-use std::{collections::HashMap, path::PathBuf, sync::Arc};
+use std::{ops::ControlFlow, time::Duration};
 
-use lsp_server::Connection;
-use lsp_types::{
-    notification::{
-        DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, DidSaveTextDocument,
-        Exit, Notification,
+use async_lsp::{
+    client_monitor::ClientProcessMonitorLayer,
+    concurrency::ConcurrencyLayer,
+    lsp_types::{
+        CodeAction, CodeActionKind, CodeActionOptions, CodeActionParams,
+        CodeActionProviderCapability, CodeActionResponse, CompletionItem, CompletionOptions,
+        CompletionParams, DidChangeConfigurationParams, DidChangeTextDocumentParams,
+        DidCloseTextDocumentParams, DidOpenTextDocumentParams, InitializeParams, InitializeResult,
+        SaveOptions, ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind,
+        TextDocumentSyncOptions, TextDocumentSyncSaveOptions,
     },
-    request::{CodeActionRequest, CodeActionResolveRequest, Completion, Request},
-    CodeAction, CodeActionOptions, CodeActionProviderCapability, CompletionOptions,
-    InitializeParams, SaveOptions, ServerCapabilities, TextDocumentSyncCapability,
-    TextDocumentSyncKind, TextDocumentSyncOptions, TextDocumentSyncSaveOptions,
+    panic::CatchUnwindLayer,
+    router::Router,
+    server::LifecycleLayer,
+    tracing::TracingLayer,
+    ClientSocket, LanguageServer, ResponseError,
 };
-use parking_lot::Mutex;
+use futures::future::BoxFuture;
 use ropey::Rope;
+use tower::ServiceBuilder;
+use tracing::{info, Level};
+use url::Url;
 
 use crate::{
     action::{shell_exec, Actions},
     encoding::{get_current_word, is_field},
-    Result,
+    state::State,
 };
 use crate::{clipboard::get_clipboard_provider, snippet::Snippets};
 use crate::{encoding::get_range_content, errors::Error};
@@ -26,237 +35,188 @@ use crate::{
     variables::VariableInit,
 };
 
-pub fn server_capabilities() -> ServerCapabilities {
-    ServerCapabilities {
-        completion_provider: Some(CompletionOptions::default()),
-        code_action_provider: Some(CodeActionProviderCapability::Options(CodeActionOptions {
-            resolve_provider: Some(true),
-            ..Default::default()
-        })),
-        // definition_provider: Some(lsp_types::OneOf::Left(true)),
-        text_document_sync: Some(TextDocumentSyncCapability::Options(
-            TextDocumentSyncOptions {
-                open_close: Some(true),
-                // change: Some(TextDocumentSyncKind::FULL),
-                change: Some(TextDocumentSyncKind::INCREMENTAL),
-                will_save: Some(true),
-                will_save_wait_until: Some(true),
-                save: Some(TextDocumentSyncSaveOptions::SaveOptions(SaveOptions {
-                    include_text: Some(true),
-                })),
-            },
-        )),
-        // workspace: Some(WorkspaceServerCapabilities { }),
-        ..Default::default()
-    }
+/// LSP 服务器
+pub struct Server {
+    #[allow(unused)]
+    pub client: ClientSocket,
+    pub state: State,
 }
 
-pub struct Server {
-    root: PathBuf,
-    // config: Config
-    lang_id: HashMap<String, String>,
-    lang_doc: Arc<Mutex<HashMap<String, Rope>>>,
-    // snippets
-    #[allow(dead_code)]
-    params: InitializeParams,
-}
+pub struct TickEvent;
 
 impl Server {
-    pub fn new(params: &InitializeParams) -> Self {
-        // FIX: 文件夹中存在多个 .helix 的目录问题
-        let mut root = std::env::current_dir().ok().unwrap();
-        if let Some(ws) = params.workspace_folders.clone() {
-            if !ws.is_empty() {
-                root = ws.first().unwrap().uri.to_file_path().unwrap();
-            }
+    pub fn router(client: ClientSocket) -> Router<Self> {
+        let mut router = Router::from_language_server(Self {
+            client,
+            state: State::default(),
+        });
+        router.event(Self::on_tick);
+        router
+    }
+
+    fn on_tick(&mut self, _: TickEvent) -> ControlFlow<async_lsp::Result<()>> {
+        ControlFlow::Continue(())
+    }
+
+    pub async fn run() {
+        let (server, _) = async_lsp::MainLoop::new_server(|client| -> _ {
+            tokio::spawn({
+                let client = client.clone();
+                async move {
+                    let mut interval = tokio::time::interval(Duration::from_secs(1));
+                    loop {
+                        interval.tick().await;
+                        if client.emit(TickEvent).is_err() {
+                            break;
+                        }
+                    }
+                }
+            });
+
+            ServiceBuilder::new()
+                .layer(TracingLayer::default())
+                .layer(LifecycleLayer::default())
+                .layer(CatchUnwindLayer::default())
+                .layer(ConcurrencyLayer::default())
+                .layer(ClientProcessMonitorLayer::new(client.clone()))
+                .service(Server::router(client))
+        });
+
+        tracing_subscriber::fmt()
+            .with_max_level(Level::INFO)
+            .without_time()
+            .with_ansi(false)
+            .with_writer(std::io::stderr)
+            .init();
+
+        // Prefer truly asynchronous piped stdin/stdout without blocking tasks.
+        #[cfg(unix)]
+        let (stdin, stdout) = (
+            async_lsp::stdio::PipeStdin::lock_tokio().unwrap(),
+            async_lsp::stdio::PipeStdout::lock_tokio().unwrap(),
+        );
+        // Fallback to spawn blocking read/write otherwise.
+        #[cfg(not(unix))]
+        let (stdin, stdout) = (
+            tokio_util::compat::TokioAsyncReadCompatExt::compat(tokio::io::stdin()),
+            tokio_util::compat::TokioAsyncWriteCompatExt::compat_write(tokio::io::stdout()),
+        );
+
+        server.run_buffered(stdin, stdout).await.unwrap();
+    }
+}
+
+// /// 获取 request 参数
+// fn cast_request<R>(request: lsp_server::Request) -> Result<R::Params>
+// where
+//     R: lsp_types::request::Request,
+//     R::Params: serde::de::DeserializeOwned,
+// {
+//     let (_, params) = request.extract(R::METHOD)?;
+//     Ok(params)
+// }
+
+// /// 获取 notification 参数
+// fn cast_notification<N>(notification: lsp_server::Notification) -> Result<N::Params>
+// where
+//     N: lsp_types::notification::Notification,
+//     N::Params: serde::de::DeserializeOwned,
+// {
+//     let params = notification.extract::<N::Params>(N::METHOD)?;
+//     Ok(params)
+// }
+
+impl LanguageServer for Server {
+    type Error = ResponseError;
+    type NotifyResult = ControlFlow<async_lsp::Result<()>>;
+
+    fn initialize(
+        &mut self,
+        params: InitializeParams,
+    ) -> BoxFuture<'static, Result<InitializeResult, Self::Error>> {
+        let unknown = "unknown".to_owned();
+        if let Some(client_info) = params.client_info {
+            let client_version = client_info.version.unwrap_or(unknown);
+            self.state
+                .update_client_info(client_info.name, client_version);
+        } else {
+            self.state.update_client_info("web".to_owned(), unknown);
         };
-
-        Server {
-            root,
-            lang_id: HashMap::new(),
-            lang_doc: Arc::new(Mutex::new(HashMap::new())),
-            params: params.clone(),
-        }
+        Box::pin(async move {
+            Ok(InitializeResult {
+                capabilities: ServerCapabilities {
+                    code_action_provider: Some(CodeActionProviderCapability::Options(
+                        CodeActionOptions {
+                            resolve_provider: Some(true),
+                            ..Default::default()
+                        },
+                    )),
+                    completion_provider: Some(CompletionOptions {
+                        resolve_provider: Some(false),
+                        ..Default::default()
+                    }),
+                    text_document_sync: Some(TextDocumentSyncCapability::Options(
+                        TextDocumentSyncOptions {
+                            open_close: Some(true),
+                            change: Some(TextDocumentSyncKind::INCREMENTAL),
+                            will_save: Some(true),
+                            will_save_wait_until: Some(true),
+                            save: Some(TextDocumentSyncSaveOptions::SaveOptions(SaveOptions {
+                                include_text: Some(true),
+                            })),
+                        },
+                    )),
+                    ..Default::default()
+                },
+                server_info: None,
+            })
+        })
     }
 
-    pub fn listen(&mut self, connection: &Connection) -> Result<()> {
-        log::info!("starting example main loop");
-
-        while let Ok(msg) = connection.receiver.recv() {
-            match msg {
-                lsp_server::Message::Request(request) => {
-                    if connection.handle_shutdown(&request)? {
-                        return Ok(());
-                    }
-
-                    let response = self.handle_request(request)?;
-
-                    connection
-                        .sender
-                        .send(lsp_server::Message::Response(response))?;
-                }
-                lsp_server::Message::Response(resp) => {
-                    log::info!("Get Response: {resp:?}");
-                }
-                lsp_server::Message::Notification(notification) => {
-                    self.handle_notification(notification)?
-                }
-            }
-        }
-
-        Ok(())
+    fn did_change_configuration(
+        &mut self,
+        _: DidChangeConfigurationParams,
+    ) -> ControlFlow<async_lsp::Result<()>> {
+        ControlFlow::Continue(())
     }
 
-    /// lsp 请求处理
-    fn handle_request(&mut self, request: lsp_server::Request) -> Result<lsp_server::Response> {
-        let id = request.id.clone();
+    fn did_open(&mut self, params: DidOpenTextDocumentParams) -> Self::NotifyResult {
+        let uri = params.text_document.uri;
+        let content = Rope::from(params.text_document.text);
+        let language_id = params.text_document.language_id;
 
-        match request.method.as_str() {
-            // 代码片段补全处理
-            Completion::METHOD => {
-                let params = cast_request::<Completion>(request).expect("cast Completion");
-                let completions = self.completion(params);
-
-                Ok(lsp_server::Response {
-                    id,
-                    error: None,
-                    result: Some(serde_json::to_value(completions)?),
-                })
-            }
-
-            // 获取可能存在的 脚本处理
-            CodeActionRequest::METHOD => {
-                let params =
-                    cast_request::<CodeActionRequest>(request).expect("cast code action request");
-                let actions = self.actions(params);
-
-                Ok(lsp_server::Response {
-                    id,
-                    error: None,
-                    result: Some(serde_json::to_value(actions)?),
-                })
-            }
-
-            CodeActionResolveRequest::METHOD => {
-                let params = cast_request::<CodeActionResolveRequest>(request)
-                    .expect("cast code action request");
-                let actions = self.action_resolve(&params)?;
-
-                Ok(lsp_server::Response {
-                    id,
-                    error: None,
-                    result: Some(serde_json::to_value(actions)?),
-                })
-            }
-
-            // DocumentDiagnosticRequest::METHOD
-            // WorkspaceDiagnosticRequest::METHOD
-            unsupported => Error::UnsupportedLspRequest {
-                request: unsupported.to_string(),
-            }
-            .into(),
-        }
-
-        // match cast_request::<Completion>(request) {
-        //     Ok((id, params)) => Vec::new(),
-
-        //     Err(err @ ExtractError::JsonError { .. }) => panic!("{err:?}"),
-        //     Err(ExtractError::MethodMismatch(req)) => req,
-        // };
+        self.state.upsert_file(&uri, content, Some(language_id));
+        ControlFlow::Continue(())
     }
 
-    /// lsp 提示处理
-    fn handle_notification(&mut self, notification: lsp_server::Notification) -> Result<()> {
-        match notification.method.as_str() {
-            Exit::METHOD => {
-                // exit
-                Ok(())
-            }
+    fn did_change(&mut self, params: DidChangeTextDocumentParams) -> Self::NotifyResult {
+        let uri = params.text_document.uri;
 
-            // 打开文件
-            DidOpenTextDocument::METHOD => {
-                let params = cast_notification::<DidOpenTextDocument>(notification)?;
-                log::debug!("OpenFile: {params:?}");
-                let uri = params.text_document.uri.path();
-
-                // ropey
-                let doc = Rope::from(params.text_document.text);
-
-                // 记录打开文件所对应的文件语言ID, 内容
-                self.lang_id
-                    .insert(uri.to_string(), params.text_document.language_id);
-                self.lang_doc.lock().insert(uri.to_string(), doc);
-
-                Ok(())
-            }
-
-            // 文件关闭
-            DidCloseTextDocument::METHOD => {
-                let params = cast_notification::<DidCloseTextDocument>(notification)?;
-                log::debug!("CloseFile: {params:?}");
-                let uri = params.text_document.uri.path();
-
-                // 移除记录的文件状态
-                self.lang_id.remove(uri);
-                self.lang_doc.lock().remove(uri);
-
-                Ok(())
-            }
-
-            // didchange
-            DidChangeTextDocument::METHOD => {
-                let params = cast_notification::<DidChangeTextDocument>(notification)?;
-                log::debug!("ChangeText: {params:?}");
-                let uri = params.text_document.uri.path();
-
-                let mut doc_lock = self.lang_doc.lock();
-                if let Some(doc) = doc_lock.get_mut(uri) {
-                    // 增量更新
-                    for change in params.content_changes {
-                        // OffseetEncoding get from document
-                        apply_content_change(doc, &change, OffsetEncoding::Utf8)?;
-                    }
-                };
-
-                // Option: change: Some(TextDocumentSyncKind::FULL),
-                // *doc = Rope::from(params.content_changes.last().unwrap().text.clone());
-
-                Ok(())
-            }
-
-            DidSaveTextDocument::METHOD => {
-                let params = cast_notification::<DidSaveTextDocument>(notification)?;
-                log::debug!("SaveFile: {params:?}");
-                let uri = params.text_document.uri.path();
-                let save = Rope::from(params.text.unwrap());
-                let mut doc_lock = self.lang_doc.lock();
-                if let Some(doc) = doc_lock.get_mut(uri) {
-                    *doc = save;
-                } else {
-                    doc_lock.insert(uri.to_string(), save);
-                }
-                Ok(())
-            }
-
-            unsupported => Error::UnsupportedLspRequest {
-                request: unsupported.to_string(),
-            }
-            .into(),
+        if !params.content_changes.is_empty() {
+            self.state.change_file(&uri, params.content_changes);
         }
+        ControlFlow::Continue(())
     }
 
-    /// 获取补全列表
+    fn did_close(&mut self, params: DidCloseTextDocumentParams) -> Self::NotifyResult {
+        let uri = params.text_document.uri;
+        self.state.remove_file(&uri);
+        ControlFlow::Continue(())
+    }
+
     fn completion(
-        &self,
-        params: lsp_types::CompletionParams,
-    ) -> Option<Vec<lsp_types::CompletionItem>> {
-        let uri = params.text_document_position.text_document.uri.path();
+        &mut self,
+        params: CompletionParams,
+    ) -> BoxFuture<'static, Result<Option<CompletionResponse>, ResponseError>> {
+        let uri = params.text_document_position.text_document.uri;
         let pos = params.text_document_position.position;
-        let lang_id = self.lang_id.get(uri)?;
+        let doc = self.state.get_contents(&uri);
+        let lang_id = self.state.get_language_id(&uri);
+        let root = self.state.get_root();
 
         let snippets = [
-            Snippets::get_lang(lang_id.clone(), &self.root),
-            Snippets::get_global(&self.root),
+            Snippets::get_lang(lang_id.clone(), &root),
+            Snippets::get_global(&root),
         ]
         .into_iter()
         .fold(Snippets::default(), |mut lang, other| {
@@ -264,10 +224,6 @@ impl Server {
             lang
         });
 
-        let doc_lock = self.lang_doc.lock();
-        let doc = doc_lock
-            .get(uri)
-            .unwrap_or_else(|| panic!("unknown cachefile of {uri}"));
         let line = doc.get_line(pos.line as usize)?;
 
         if is_field(&line, pos.character as usize) {
@@ -291,7 +247,7 @@ impl Server {
                 .uri
                 .to_file_path()
                 .unwrap(),
-            work_path: self.root.clone(),
+            work_path: root.clone(),
             line_pos: params.text_document_position.position.line as usize,
             line_text: line.to_string(),
             current_word: cursor_word,
@@ -299,27 +255,31 @@ impl Server {
             clipboard: None, // get_clipboard_provider().get_contents().ok(),
         };
 
-        Some(snippets.to_completion_items(&variable_init))
+        Ok(Some(snippets.to_completion_items(&variable_init)))
     }
 
-    fn actions(&self, params: lsp_types::CodeActionParams) -> Option<Vec<lsp_types::CodeAction>> {
-        let uri = params.text_document.uri.path();
-        let lang_id = self.lang_id.get(uri)?;
-        let doc_lock = self.lang_doc.lock();
-        let doc = doc_lock.get(uri)?;
+    fn code_action(
+        &mut self,
+        params: CodeActionParams,
+    ) -> BoxFuture<'static, Result<Option<CodeActionResponse>, ResponseError>> {
+        let uri = params.text_document.uri;
+        let range = params.range;
+        let doc = self.state.get_contents(&uri);
+        let lang_id = self.state.get_language_id(&uri);
+        let root = self.state.get_root();
 
         let line = doc.get_line(params.range.end.line as usize)?;
         let cursor_word =
             get_current_word(&line, params.range.end.character as usize).unwrap_or_default();
 
-        let actions = Actions::get_lang(lang_id.clone(), doc, &params.range, &self.root);
+        let actions = Actions::get_lang(lang_id.clone(), &doc, &range, &root);
 
         let range_content =
-            get_range_content(doc, &params.range, OffsetEncoding::Utf8).unwrap_or("".into());
+            get_range_content(&doc, &params.range, OffsetEncoding::Utf8).unwrap_or("".into());
 
         let variable_init = VariableInit {
             file_path: params.text_document.uri.to_file_path().unwrap(),
-            work_path: self.root.clone(),
+            work_path: root,
             line_pos: params.range.start.line as usize,
             line_text: line.to_string(),
             current_word: cursor_word.to_string(),
@@ -327,39 +287,13 @@ impl Server {
             clipboard: None, // get_clipboard_provider().get_contents().ok(),
         };
 
-        Some(actions.to_code_action_items(&variable_init))
+        Some(actions.to_code_action_items(&variable_init));
+
+        // Box::pin(async move { Ok(None) })
     }
 
-    fn action_resolve(&self, action: &CodeAction) -> Result<CodeAction> {
-        let cmd = action.clone().command.expect("unknow cmd");
-
-        shell_exec(cmd.command.as_str())?;
-
-        // 设置 title 和 tooltip
-        let mut resolved_action = action.clone();
-        resolved_action.kind = Some(lsp_types::CodeActionKind::EMPTY);
-        resolved_action.command = None;
-
-        Ok(resolved_action)
+    fn shutdown(&mut self, _: ()) -> BoxFuture<'static, Result<(), ResponseError>> {
+        info!("shutdown...");
+        Box::pin(async move { Ok(()) })
     }
-}
-
-/// 获取 request 参数
-fn cast_request<R>(request: lsp_server::Request) -> Result<R::Params>
-where
-    R: lsp_types::request::Request,
-    R::Params: serde::de::DeserializeOwned,
-{
-    let (_, params) = request.extract(R::METHOD)?;
-    Ok(params)
-}
-
-/// 获取 notification 参数
-fn cast_notification<N>(notification: lsp_server::Notification) -> Result<N::Params>
-where
-    N: lsp_types::notification::Notification,
-    N::Params: serde::de::DeserializeOwned,
-{
-    let params = notification.extract::<N::Params>(N::METHOD)?;
-    Ok(params)
 }

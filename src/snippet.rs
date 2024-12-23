@@ -3,7 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use lsp_types::{CompletionItem, CompletionItemKind};
+use async_lsp::lsp_types::{CompletionItem, CompletionItemKind};
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use std::sync::OnceLock;

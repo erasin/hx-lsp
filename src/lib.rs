@@ -12,4 +12,5 @@ pub mod loader;
 pub mod lsp;
 pub mod parser;
 pub mod snippet;
+pub mod state;
 pub mod variables;

@@ -5,11 +5,12 @@ use std::{
     sync::OnceLock,
 };
 
-use lsp_types::{CodeAction, Range};
+use async_lsp::lsp_types::{self, CodeAction, Range};
 use parking_lot::Mutex;
 use regex::Regex;
 use ropey::Rope;
 use serde::{Deserialize, Serialize};
+use tracing as log;
 
 use crate::{
     loader::{config_dir, Dirs},
