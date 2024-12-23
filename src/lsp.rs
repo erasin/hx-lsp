@@ -5,11 +5,13 @@ use async_lsp::{
     concurrency::ConcurrencyLayer,
     lsp_types::{
         CodeAction, CodeActionKind, CodeActionOptions, CodeActionParams,
-        CodeActionProviderCapability, CodeActionResponse, CompletionItem, CompletionOptions,
-        CompletionParams, DidChangeConfigurationParams, DidChangeTextDocumentParams,
-        DidCloseTextDocumentParams, DidOpenTextDocumentParams, InitializeParams, InitializeResult,
-        SaveOptions, ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind,
-        TextDocumentSyncOptions, TextDocumentSyncSaveOptions,
+        CodeActionProviderCapability, CodeActionResponse, ColorInformation,
+        ColorProviderCapability, CompletionItem, CompletionOptions, CompletionParams,
+        CompletionResponse, DidChangeConfigurationParams, DidChangeTextDocumentParams,
+        DidCloseTextDocumentParams, DidOpenTextDocumentParams, DocumentColorParams,
+        InitializeParams, InitializeResult, InitializedParams, SaveOptions, ServerCapabilities,
+        TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
+        TextDocumentSyncSaveOptions,
     },
     panic::CatchUnwindLayer,
     router::Router,
@@ -17,11 +19,10 @@ use async_lsp::{
     tracing::TracingLayer,
     ClientSocket, LanguageServer, ResponseError,
 };
-use futures::future::BoxFuture;
+use futures::{executor::BlockingStream, future::BoxFuture};
 use ropey::Rope;
 use tower::ServiceBuilder;
 use tracing::{info, Level};
-use url::Url;
 
 use crate::{
     action::{shell_exec, Actions},
@@ -107,26 +108,6 @@ impl Server {
     }
 }
 
-// /// 获取 request 参数
-// fn cast_request<R>(request: lsp_server::Request) -> Result<R::Params>
-// where
-//     R: lsp_types::request::Request,
-//     R::Params: serde::de::DeserializeOwned,
-// {
-//     let (_, params) = request.extract(R::METHOD)?;
-//     Ok(params)
-// }
-
-// /// 获取 notification 参数
-// fn cast_notification<N>(notification: lsp_server::Notification) -> Result<N::Params>
-// where
-//     N: lsp_types::notification::Notification,
-//     N::Params: serde::de::DeserializeOwned,
-// {
-//     let params = notification.extract::<N::Params>(N::METHOD)?;
-//     Ok(params)
-// }
-
 impl LanguageServer for Server {
     type Error = ResponseError;
     type NotifyResult = ControlFlow<async_lsp::Result<()>>;
@@ -135,6 +116,13 @@ impl LanguageServer for Server {
         &mut self,
         params: InitializeParams,
     ) -> BoxFuture<'static, Result<InitializeResult, Self::Error>> {
+        //  文件夹中存在多个 .helix 的目录问题
+        if let Some(ws) = params.workspace_folders.clone() {
+            if !ws.is_empty() {
+                self.state.root = ws.first().unwrap().uri.to_file_path().unwrap();
+            }
+        };
+
         let unknown = "unknown".to_owned();
         if let Some(client_info) = params.client_info {
             let client_version = client_info.version.unwrap_or(unknown);
@@ -156,6 +144,7 @@ impl LanguageServer for Server {
                         resolve_provider: Some(false),
                         ..Default::default()
                     }),
+                    color_provider: Some(ColorProviderCapability::Simple(true)),
                     text_document_sync: Some(TextDocumentSyncCapability::Options(
                         TextDocumentSyncOptions {
                             open_close: Some(true),
@@ -187,6 +176,7 @@ impl LanguageServer for Server {
         let language_id = params.text_document.language_id;
 
         self.state.upsert_file(&uri, content, Some(language_id));
+
         ControlFlow::Continue(())
     }
 
@@ -201,7 +191,9 @@ impl LanguageServer for Server {
 
     fn did_close(&mut self, params: DidCloseTextDocumentParams) -> Self::NotifyResult {
         let uri = params.text_document.uri;
-        self.state.remove_file(&uri);
+
+        self.state.remove_file(&uri.clone());
+
         ControlFlow::Continue(())
     }
 
@@ -213,50 +205,48 @@ impl LanguageServer for Server {
         let pos = params.text_document_position.position;
         let doc = self.state.get_contents(&uri);
         let lang_id = self.state.get_language_id(&uri);
-        let root = self.state.get_root();
+        let root = self.state.root.clone();
+        Box::pin(async move {
+            let snippets = [
+                Snippets::get_lang(lang_id.clone(), &root),
+                Snippets::get_global(&root),
+            ]
+            .into_iter()
+            .fold(Snippets::default(), |mut lang, other| {
+                lang.extend(other);
+                lang
+            });
 
-        let snippets = [
-            Snippets::get_lang(lang_id.clone(), &root),
-            Snippets::get_global(&root),
-        ]
-        .into_iter()
-        .fold(Snippets::default(), |mut lang, other| {
-            lang.extend(other);
-            lang
-        });
+            let line = doc.get_line(pos.line as usize).unwrap();
 
-        let line = doc.get_line(pos.line as usize)?;
-
-        if is_field(&line, pos.character as usize) {
-            return None;
-        };
-
-        let mut cursor_word = String::new();
-
-        let snippets = match get_current_word(&line, pos.character as usize) {
-            Some(word) => {
-                cursor_word = word.to_string();
-                snippets.filter(word).ok()?
+            if is_field(&line, pos.character as usize) {
+                return Ok(None);
             }
-            None => snippets,
-        };
 
-        let variable_init = VariableInit {
-            file_path: params
-                .text_document_position
-                .text_document
-                .uri
-                .to_file_path()
-                .unwrap(),
-            work_path: root.clone(),
-            line_pos: params.text_document_position.position.line as usize,
-            line_text: line.to_string(),
-            current_word: cursor_word,
-            selected_text: Default::default(),
-            clipboard: None, // get_clipboard_provider().get_contents().ok(),
-        };
+            let mut cursor_word = String::new();
 
-        Ok(Some(snippets.to_completion_items(&variable_init)))
+            let snippets = match get_current_word(&line, pos.character as usize) {
+                Some(word) => {
+                    cursor_word = word.to_string();
+                    snippets.filter(word).ok().unwrap()
+                }
+                None => snippets,
+            };
+
+            let variable_init = VariableInit {
+                file_path: uri.to_file_path().unwrap(),
+                work_path: root.clone(),
+                line_pos: params.text_document_position.position.line as usize,
+                line_text: line.to_string(),
+                current_word: cursor_word,
+                selected_text: Default::default(),
+                clipboard: None, // get_clipboard_provider().get_contents().ok(),
+            };
+
+            let items = snippets.to_completion_items(&variable_init);
+
+            Ok(Some(CompletionResponse::Array(items)))
+        })
     }
 
     fn code_action(
@@ -265,11 +255,13 @@ impl LanguageServer for Server {
     ) -> BoxFuture<'static, Result<Option<CodeActionResponse>, ResponseError>> {
         let uri = params.text_document.uri;
         let range = params.range;
-        let doc = self.state.get_contents(&uri);
-        let lang_id = self.state.get_language_id(&uri);
-        let root = self.state.get_root();
+        let state = self.state.clone();
 
-        let line = doc.get_line(params.range.end.line as usize)?;
+        let doc = state.get_contents(&uri);
+        let lang_id = state.get_language_id(&uri);
+        let root = state.root.clone();
+
+        let line = doc.get_line(params.range.end.line as usize).unwrap();
         let cursor_word =
             get_current_word(&line, params.range.end.character as usize).unwrap_or_default();
 
@@ -279,7 +271,7 @@ impl LanguageServer for Server {
             get_range_content(&doc, &params.range, OffsetEncoding::Utf8).unwrap_or("".into());
 
         let variable_init = VariableInit {
-            file_path: params.text_document.uri.to_file_path().unwrap(),
+            file_path: uri.to_file_path().unwrap(),
             work_path: root,
             line_pos: params.range.start.line as usize,
             line_text: line.to_string(),
@@ -287,10 +279,24 @@ impl LanguageServer for Server {
             selected_text: range_content.to_string(),
             clipboard: None, // get_clipboard_provider().get_contents().ok(),
         };
+        let actions = actions
+            .to_code_action_items(&variable_init)
+            .iter()
+            .map(|item| item.clone().into())
+            .collect();
 
-        Some(actions.to_code_action_items(&variable_init));
+        Box::pin(async move { Ok(Some(actions)) })
+    }
 
-        // Box::pin(async move { Ok(None) })
+    fn document_color(
+        &mut self,
+        params: DocumentColorParams,
+    ) -> BoxFuture<'static, Result<Vec<ColorInformation>, ResponseError>> {
+        let uri = params.text_document.uri;
+        let doc = self.state.get_contents(&uri);
+        let colors = extract_colors(&doc);
+
+        Box::pin(async move { Ok(colors) })
     }
 
     fn shutdown(&mut self, _: ()) -> BoxFuture<'static, Result<(), ResponseError>> {

@@ -1,12 +1,4 @@
-use flexi_logger::{FileSpec, Logger, WriteMode};
-use lsp_server::Connection;
-
-use hx_lsp::{
-    lsp::{server_capabilities, Server},
-    variables::get_time_offset,
-    Result,
-};
-use lsp_types::InitializeParams;
+use hx_lsp::{lsp::Server, variables::get_time_offset};
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {

@@ -1,5 +1,6 @@
-use lsp_types::{Range, TextDocumentContentChangeEvent};
+use async_lsp::lsp_types::{Position, Range, TextDocumentContentChangeEvent};
 use ropey::{Rope, RopeSlice};
+use tracing::warn;
 
 use crate::errors::Error;
 
@@ -23,12 +24,12 @@ pub enum OffsetEncoding {
 /// Returns `None` if position.line is out of bounds or an overflow occurs
 pub fn lsp_pos_to_pos(
     doc: &Rope,
-    pos: lsp_types::Position,
+    pos: Position,
     offset_encoding: OffsetEncoding,
 ) -> Result<usize, Error> {
     let pos_line = pos.line as usize;
     if pos_line > doc.len_lines() - 1 {
-        log::warn!("LSP position {pos:?} out of range assuming EOF");
+        warn!("LSP position {pos:?} out of range assuming EOF");
         return Err(Error::PositionOutOfBounds(pos.line, pos.character));
     }
 

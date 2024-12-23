@@ -2,6 +2,7 @@ use std::{collections::HashMap, fs::File, io::BufReader, path::PathBuf};
 
 use json_comments::StripComments;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use tracing::error;
 
 use crate::Result;
 
@@ -26,7 +27,7 @@ where
     let hs = match serde_json::from_reader(json_data) {
         Ok(s) => s,
         Err(err) => {
-            log::error!("Parse Fail: {err:?}");
+            error!("Parse Fail: {err:?}");
             return Err(err.into());
         }
     };

@@ -7,29 +7,25 @@ use std::{
 };
 use tracing::info;
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct State {
-    root: PathBuf,
-    documents: Arc<RwLock<HashMap<Url, Rope>>>,
-    language_ids: Arc<RwLock<HashMap<Url, String>>>,
+    pub root: PathBuf,
+    pub documents: Arc<RwLock<HashMap<Url, Rope>>>,
+    pub language_ids: Arc<RwLock<HashMap<Url, String>>>,
     pub client_info: ClientInfo,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct ClientInfo {
     pub name: String,
     pub version: String,
 }
 
 impl State {
-    pub fn get_root(&self) -> PathBuf {
-        self.root.clone()
-    }
-
     pub fn get_contents(&self, uri: &Url) -> Rope {
         self.documents
             .read()
-            .expect("poison")
+            .expect("Get Content Fail")
             .get(uri)
             .map(|s| s.to_owned())
             .unwrap_or_default()
@@ -38,7 +34,7 @@ impl State {
     pub fn get_language_id(&self, uri: &Url) -> String {
         self.language_ids
             .read()
-            .expect("poison")
+            .expect("Get Language Id Fail")
             .get(uri)
             .map(|s| s.to_owned())
             .unwrap_or_default()
@@ -49,11 +45,11 @@ impl State {
         if let Some(language_id) = language_id {
             self.language_ids
                 .write()
-                .expect("poison")
+                .expect("Set Content Fail")
                 .insert(uri.clone(), language_id);
         };
 
-        let mut docs = self.documents.write().expect("poison");
+        let mut docs = self.documents.write().expect("Get Document Fail");
         docs.insert(uri.clone(), content);
     }
 
@@ -61,7 +57,7 @@ impl State {
         if let Some(doc) = self
             .documents
             .write()
-            .expect("poison")
+            .expect("Get Document Fail")
             .get_mut(&uri.clone())
         {
             for content in contents {
@@ -79,10 +75,13 @@ impl State {
     }
 
     pub fn remove_file(&self, uri: &Url) {
-        self.documents.write().expect("poison").remove(&uri.clone());
+        self.documents
+            .write()
+            .expect("Get Document Fail")
+            .remove(&uri.clone());
         self.language_ids
             .write()
-            .expect("poison")
+            .expect("Get Language Id Fail")
             .remove(&uri.clone());
     }
 

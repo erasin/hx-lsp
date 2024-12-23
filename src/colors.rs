@@ -1,4 +1,4 @@
-use lsp_types::{Color, ColorInformation, Position, Range};
+use async_lsp::lsp_types::{Color, ColorInformation, Position, Range};
 use ropey::Rope;
 
 pub fn extract_colors(doc: &Rope) -> Vec<ColorInformation> {
