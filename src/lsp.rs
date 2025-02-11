@@ -6,12 +6,12 @@ use async_lsp::{
     lsp_types::{
         CodeAction, CodeActionKind, CodeActionOptions, CodeActionParams,
         CodeActionProviderCapability, CodeActionResponse, ColorInformation,
-        ColorProviderCapability, CompletionItem, CompletionOptions, CompletionParams,
-        CompletionResponse, DidChangeConfigurationParams, DidChangeTextDocumentParams,
-        DidCloseTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams,
-        DocumentColorParams, InitializeParams, InitializeResult, InitializedParams, SaveOptions,
-        ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind,
-        TextDocumentSyncOptions, TextDocumentSyncSaveOptions,
+        ColorProviderCapability, CompletionOptions, CompletionParams, CompletionResponse,
+        DidChangeConfigurationParams, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
+        DidOpenTextDocumentParams, DidSaveTextDocumentParams, DocumentColorParams,
+        InitializeParams, InitializeResult, SaveOptions, ServerCapabilities,
+        TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
+        TextDocumentSyncSaveOptions,
     },
     panic::CatchUnwindLayer,
     router::Router,
@@ -20,23 +20,20 @@ use async_lsp::{
     ClientSocket, LanguageServer, ResponseError,
 };
 use copypasta::{ClipboardContext, ClipboardProvider};
-use futures::{executor::BlockingStream, future::BoxFuture};
+use futures::future::BoxFuture;
 use ropey::Rope;
 use tower::ServiceBuilder;
 use tracing::{info, Level};
 
+use crate::encoding::get_range_content;
 use crate::snippet::Snippets;
 use crate::{
     action::{shell_exec, Actions},
-    colors::{extract_colors, parse_color},
+    colors::extract_colors,
     encoding::{get_current_word, is_field},
     state::State,
 };
-use crate::{encoding::get_range_content, errors::Error};
-use crate::{
-    encoding::{apply_content_change, OffsetEncoding},
-    variables::VariableInit,
-};
+use crate::{encoding::OffsetEncoding, variables::VariableInit};
 
 /// LSP 服务器
 pub struct Server {
