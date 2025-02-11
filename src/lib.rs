@@ -3,7 +3,6 @@
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
 pub mod action;
-pub mod clipboard;
 pub mod colors;
 pub mod encoding;
 pub mod env;

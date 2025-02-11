@@ -1,6 +1,6 @@
 [package]
 name = "hx-lsp"
-version = "0.1.3"
+version = "0.1.5"
 authors = ["erasin <erasinoo@gmail.com>"]
 edition = "2021"
 description = "One LSP server support snippets and actions for helix editor."
@@ -16,6 +16,7 @@ term = []
 [dependencies]
 aho-corasick = "1.1.3"
 async-lsp = { version = "0.2.1", features = ["tokio"] }
+copypasta = "0.10.1"
 crossbeam-channel = "0.5"
 etcetera = "0.8.0"
 futures = "0.3.31"

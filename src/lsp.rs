@@ -19,18 +19,19 @@ use async_lsp::{
     tracing::TracingLayer,
     ClientSocket, LanguageServer, ResponseError,
 };
+use copypasta::{ClipboardContext, ClipboardProvider};
 use futures::{executor::BlockingStream, future::BoxFuture};
 use ropey::Rope;
 use tower::ServiceBuilder;
 use tracing::{info, Level};
 
+use crate::snippet::Snippets;
 use crate::{
     action::{shell_exec, Actions},
     colors::{extract_colors, parse_color},
     encoding::{get_current_word, is_field},
     state::State,
 };
-use crate::{clipboard::get_clipboard_provider, snippet::Snippets};
 use crate::{encoding::get_range_content, errors::Error};
 use crate::{
     encoding::{apply_content_change, OffsetEncoding},
@@ -189,7 +190,10 @@ impl LanguageServer for Server {
         ControlFlow::Continue(())
     }
 
-    fn did_save(&mut self, _params: DidSaveTextDocumentParams) -> Self::NotifyResult {
+    fn did_save(&mut self, params: DidSaveTextDocumentParams) -> Self::NotifyResult {
+        let uri = params.text_document.uri;
+        let content = Rope::from(params.text.unwrap());
+        self.state.apply_content_change(&uri, content);
         ControlFlow::Continue(())
     }
 
@@ -237,6 +241,8 @@ impl LanguageServer for Server {
                 None => snippets,
             };
 
+            let mut ctx = ClipboardContext::new().unwrap();
+
             let variable_init = VariableInit {
                 file_path: uri.to_file_path().unwrap(),
                 work_path: root.clone(),
@@ -244,7 +250,7 @@ impl LanguageServer for Server {
                 line_text: line.to_string(),
                 current_word: cursor_word,
                 selected_text: Default::default(),
-                clipboard: None, // get_clipboard_provider().get_contents().ok(),
+                clipboard: ctx.get_contents().ok(),
             };
 
             let items = snippets.to_completion_items(&variable_init);

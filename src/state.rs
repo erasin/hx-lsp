@@ -53,6 +53,17 @@ impl State {
         docs.insert(uri.clone(), content);
     }
 
+    pub fn apply_content_change(&mut self, uri: &Url, content: Rope) {
+        if let Some(doc) = self
+            .documents
+            .write()
+            .expect("Get Document Fail")
+            .get_mut(&uri.clone())
+        {
+            *doc = content
+        }
+    }
+
     pub fn change_file(&mut self, uri: &Url, contents: Vec<TextDocumentContentChangeEvent>) {
         if let Some(doc) = self
             .documents
