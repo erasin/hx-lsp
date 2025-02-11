@@ -10,6 +10,9 @@ repository = "https://github.com/erasin/hx-lsp"
 keywords = ["helix", "lsp", "snippets"]
 exclude = [".helix"]
 
+[features]
+term = []
+
 [dependencies]
 aho-corasick = "1.1.3"
 async-lsp = { version = "0.2.1", features = ["tokio"] }

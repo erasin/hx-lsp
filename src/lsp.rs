@@ -8,10 +8,10 @@ use async_lsp::{
         CodeActionProviderCapability, CodeActionResponse, ColorInformation,
         ColorProviderCapability, CompletionItem, CompletionOptions, CompletionParams,
         CompletionResponse, DidChangeConfigurationParams, DidChangeTextDocumentParams,
-        DidCloseTextDocumentParams, DidOpenTextDocumentParams, DocumentColorParams,
-        InitializeParams, InitializeResult, InitializedParams, SaveOptions, ServerCapabilities,
-        TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
-        TextDocumentSyncSaveOptions,
+        DidCloseTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams,
+        DocumentColorParams, InitializeParams, InitializeResult, InitializedParams, SaveOptions,
+        ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind,
+        TextDocumentSyncOptions, TextDocumentSyncSaveOptions,
     },
     panic::CatchUnwindLayer,
     router::Router,
@@ -189,6 +189,10 @@ impl LanguageServer for Server {
         ControlFlow::Continue(())
     }
 
+    fn did_save(&mut self, _params: DidSaveTextDocumentParams) -> Self::NotifyResult {
+        ControlFlow::Continue(())
+    }
+
     fn did_close(&mut self, params: DidCloseTextDocumentParams) -> Self::NotifyResult {
         let uri = params.text_document.uri;
 
@@ -286,6 +290,22 @@ impl LanguageServer for Server {
             .collect();
 
         Box::pin(async move { Ok(Some(actions)) })
+    }
+
+    fn code_action_resolve(
+        &mut self,
+        params: CodeAction,
+    ) -> BoxFuture<'static, Result<CodeAction, ResponseError>> {
+        let cmd = params.clone().command.expect("unknow cmd");
+
+        shell_exec(cmd.command.as_str()).unwrap();
+
+        // 设置 title 和 tooltip
+        let mut resolved_action = params.clone();
+        resolved_action.kind = Some(CodeActionKind::EMPTY);
+        resolved_action.command = None;
+
+        Box::pin(async move { Ok(resolved_action) })
     }
 
     fn document_color(

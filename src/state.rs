@@ -5,7 +5,7 @@ use std::{
     path::PathBuf,
     sync::{Arc, RwLock},
 };
-use tracing::info;
+use tracing::debug;
 
 #[derive(Default, Clone)]
 pub struct State {
@@ -41,7 +41,7 @@ impl State {
     }
 
     pub fn upsert_file(&mut self, uri: &Url, content: Rope, language_id: Option<String>) {
-        info!("upserting file: {}", uri);
+        debug!("upserting file: {}", uri);
         if let Some(language_id) = language_id {
             self.language_ids
                 .write()
