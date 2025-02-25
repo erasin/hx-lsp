@@ -2,7 +2,7 @@
 name = "hx-lsp"
 version = "0.1.5"
 authors = ["erasin <erasinoo@gmail.com>"]
-edition = "2021"
+edition = "2024"
 description = "One LSP server support snippets and actions for helix editor."
 license = "MIT"
 readme = "README.md"
