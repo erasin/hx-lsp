@@ -1,7 +1,7 @@
 use std::{collections::HashMap, fs::File, io::BufReader, path::PathBuf};
 
 use json_comments::StripComments;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use tracing::error;
 
 use crate::Result;

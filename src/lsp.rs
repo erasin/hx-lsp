@@ -1,6 +1,7 @@
 use std::{ops::ControlFlow, time::Duration};
 
 use async_lsp::{
+    ClientSocket, LanguageServer, ResponseError,
     client_monitor::ClientProcessMonitorLayer,
     concurrency::ConcurrencyLayer,
     lsp_types::{
@@ -17,18 +18,17 @@ use async_lsp::{
     router::Router,
     server::LifecycleLayer,
     tracing::TracingLayer,
-    ClientSocket, LanguageServer, ResponseError,
 };
 use copypasta::{ClipboardContext, ClipboardProvider};
 use futures::future::BoxFuture;
 use ropey::Rope;
 use tower::ServiceBuilder;
-use tracing::{info, Level};
+use tracing::{Level, info};
 
 use crate::encoding::get_range_content;
 use crate::snippet::Snippets;
 use crate::{
-    action::{shell_exec, Actions},
+    action::{Actions, shell_exec},
     colors::extract_colors,
     encoding::{get_current_word, is_field},
     state::State,

@@ -13,10 +13,10 @@ use serde::{Deserialize, Serialize};
 use tracing as log;
 
 use crate::{
-    loader::{config_dir, Dirs},
-    parser::{parse, Parser, StrOrSeq},
-    variables::{VariableInit, Variables},
     Result,
+    loader::{Dirs, config_dir},
+    parser::{Parser, StrOrSeq, parse},
+    variables::{VariableInit, Variables},
 };
 
 #[derive(Deserialize, Serialize, Clone, Debug)]

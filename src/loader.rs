@@ -6,7 +6,7 @@
 
 use std::path::PathBuf;
 
-use etcetera::{choose_base_strategy, BaseStrategy};
+use etcetera::{BaseStrategy, choose_base_strategy};
 
 /// Dirs ...
 pub enum Dirs {

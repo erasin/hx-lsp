@@ -2,7 +2,7 @@ use std::{path::PathBuf, sync::OnceLock};
 
 use aho_corasick::AhoCorasick;
 use rand::distributions::{Distribution, Uniform};
-use time::{format_description, OffsetDateTime, UtcOffset};
+use time::{OffsetDateTime, UtcOffset, format_description};
 use uuid::Uuid;
 
 use crate::encoding::char_is_word;

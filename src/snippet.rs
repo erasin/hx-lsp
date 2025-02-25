@@ -9,11 +9,11 @@ use serde::{Deserialize, Serialize};
 use std::sync::OnceLock;
 
 use crate::{
-    fuzzy::fuzzy_match,
-    loader::{config_dir, Dirs},
-    parser::{parse, Parser, StrOrSeq},
-    variables::{VariableInit, Variables},
     Result,
+    fuzzy::fuzzy_match,
+    loader::{Dirs, config_dir},
+    parser::{Parser, StrOrSeq, parse},
+    variables::{VariableInit, Variables},
 };
 
 /// 代码片段
