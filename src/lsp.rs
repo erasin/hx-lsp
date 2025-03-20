@@ -25,14 +25,14 @@ use ropey::Rope;
 use tower::ServiceBuilder;
 use tracing::{Level, info};
 
-use crate::encoding::get_range_content;
-use crate::snippet::Snippets;
+use crate::{action::ActionData, snippet::Snippets};
 use crate::{
-    action::{Actions, shell_exec},
+    action::Actions,
     colors::extract_colors,
     encoding::{get_current_word, is_field},
     state::State,
 };
+use crate::{action::shell_impl, encoding::get_range_content};
 use crate::{encoding::OffsetEncoding, variables::VariableInit};
 
 /// LSP 服务器
@@ -260,7 +260,7 @@ impl LanguageServer for Server {
         &mut self,
         params: CodeActionParams,
     ) -> BoxFuture<'static, Result<Option<CodeActionResponse>, ResponseError>> {
-        let uri = params.text_document.uri;
+        let uri = params.text_document.uri.clone();
         let range = params.range;
         let state = self.state.clone();
 
@@ -286,8 +286,9 @@ impl LanguageServer for Server {
             selected_text: range_content.to_string(),
             clipboard: None, // get_clipboard_provider().get_contents().ok(),
         };
+
         let actions = actions
-            .to_code_action_items(&variable_init)
+            .to_code_action_items(&variable_init, &params.into())
             .iter()
             .map(|item| item.clone().into())
             .collect();
@@ -301,10 +302,30 @@ impl LanguageServer for Server {
     ) -> BoxFuture<'static, Result<CodeAction, ResponseError>> {
         let cmd = params.clone().command.expect("unknow cmd");
 
-        shell_exec(cmd.command.as_str()).unwrap();
+        let data: ActionData = serde_json::from_value(params.data.clone().unwrap()).unwrap();
+        let uri = data.text_document.uri;
+
+        let range = data.range;
+        let selected = if range.start != range.end {
+            let state = self.state.clone();
+            let doc = state.get_contents(&uri);
+            // let lang_id = state.get_language_id(&uri);
+            // let root = state.root.clone();
+            let range_content = get_range_content(&doc, &range, OffsetEncoding::Utf8)
+                .unwrap_or("".into())
+                .into();
+            Some(range_content)
+        } else {
+            None
+        };
 
         // 设置 title 和 tooltip
         let mut resolved_action = params.clone();
+
+        if let Ok(re) = shell_impl(cmd.command.as_str(), &selected) {
+            resolved_action.data = Some(serde_json::to_value(re.clone()).unwrap());
+        }
+
         resolved_action.kind = Some(CodeActionKind::EMPTY);
         resolved_action.command = None;
 

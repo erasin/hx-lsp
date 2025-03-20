@@ -3,13 +3,14 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use anyhow::Result;
 use async_lsp::lsp_types::{CompletionItem, CompletionItemKind};
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use std::sync::OnceLock;
 
 use crate::{
-    Result,
+    // Result,
     fuzzy::fuzzy_match,
     loader::{Dirs, config_dir},
     parser::{Parser, StrOrSeq, parse},

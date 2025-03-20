@@ -4,7 +4,8 @@ use json_comments::StripComments;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use tracing::error;
 
-use crate::Result;
+// use crate::Result;
+use anyhow::Result;
 
 pub trait Parser {
     type Item: DeserializeOwned + Clone;

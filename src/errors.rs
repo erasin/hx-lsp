@@ -23,8 +23,8 @@ pub enum Error {
     NotFound(String),
 }
 
-impl<T> From<Error> for crate::Result<T> {
-    fn from(val: Error) -> Self {
-        Err(Box::new(val))
-    }
-}
+// impl<T> From<Error> for crate::Result<T> {
+//     fn from(val: Error) -> Self {
+//         Err(Box::new(val))
+//     }
+// }
