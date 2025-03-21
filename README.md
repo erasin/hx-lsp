@@ -4,7 +4,7 @@
 
 An LSP tool that provides custom code snippets and Code Actions for [Helix Editor](https://github.com/helix-editor/helix).
 
-## features
+## Features
 
 - Completion: snippets
 - CodeAction: actions
@@ -134,16 +134,34 @@ Snippet Format：
 Snippet Formatter：
 
 - **title**: `String` helix editor show Code Action Item
-- **catch**: `String` catch line content，regex ，code action
-- **shell**: `String` Or `Vec<String>` , take shell script
+- **flter**: `String` Or `Vec<String>` Shell script: return `true`,`1` or empty , 
+- **shell**: `String` Or `Vec<String>` Shell script: take shell script
 - **description**: `Option<String>` Tip content
+
+```jsonc
+/* actions/markdown.json */
+{
+	"bold": {
+		"title": "bold",
+		"filter": "",
+		"shell": ["echo -n **${TM_SELECTED_TEXT}**"],
+		"description": "bold"
+	},
+	"italic": {
+		"title": "italic",
+		"filter": "",
+		"shell": ["echo -n _${TM_SELECTED_TEXT}_"],
+		"description": "italic"
+	}
+}
+```
 
 ```jsonc
 /* actions/go.json */
 {
   "run main": {
     "title": "go run main",
-    "catch": "func main",
+    "filter": "func main",
     "shell": [
       "alacritty --hold --working-directory ${TM_DIRECTORY} -e go run ${TM_FILENAME}"
     ],
@@ -161,26 +179,6 @@ Snippet Formatter：
 }
 ```
 
-```jsonc
-/* test */
-{
-  "tmux split window helix": {
-    "title": "tmux split window in project",
-    "catch": "fn",
-    "shell": [
-      "tmux split-window -h",
-      "tmux send \"cd ${WORKSPACE_FOLDER}\n\""
-    ],
-    "description": "tmux split and open helix in project"
-  }
-}
-```
-
-**catch**：
-
-- [x] regex line
-- [ ] selected content
-- [ ] match in regex
 
 
 ## Variables

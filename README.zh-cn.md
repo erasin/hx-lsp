@@ -7,8 +7,9 @@
 
 ## 功能
 
-- Completion: snippets
-- CodeAction: actions
+- Completion: snippets()
+- CodeAction: actions (helix#9801)
+- Document Color (helix#12308)
 
 ## 安装
 
@@ -26,12 +27,11 @@ cd hx-lsp
 cargo install --path .
 ```
 
-> 在 https://github.com/erasin/helix-config/ 中有示例代码，另外我自己使用的分支已经合并了 [helix#9081 Add a snippet system](https://github.com/helix-editor/helix/pull/9801)。
+> 在 <https://github.com/erasin/dotfiles/tree/main/helix/> 中有示例代码，~~另外我自己使用的分支已经合并了 [helix#9081 Add a snippet system](https://github.com/helix-editor/helix/pull/9801)。~~
 
 ## 使用
 
-
-修改 helix 的语言配置文件 `languages.toml`， 修改下面文件任何一个即可
+helix 的语言配置文件 `languages.toml`， 修改下面文件任何一个即可
 
 - `$XDG_CONFIG_HOME/helix/languages.toml` helix 配置文件
 - `WORKSPACE_ROOT/.helix/languages.toml` 项目下配置文件
@@ -58,26 +58,27 @@ language-servers = [ "marksman", "markdown-oxide", "hx-lsp" ]
 
 > 注释样式支持 `// ...`, `/* ... */`, `# ...` 。 
 
-Snippets 文件加载路径
+**Snippets** 文件加载路径
 
 - `$XDG_CONFIG_HOME/helix/snippets/`
--  `WORKSPACE_ROOT/.helix/snippets/`
+- `WORKSPACE_ROOT/.helix/snippets/`
 
-Actions 配置加载路径
+**Actions** 配置加载路径
 
 - `$XDG_CONFIG_HOME/helix/actions/`
 - `WORKSPACE_ROOT/.helix/actions/`
 
-配置在 `textDocument/didOpen` 时候加载 `language id` 同名 `lang_id.json` 文件。
+hx-lsp 会在打开文件的时候自动加载配置语言的相关文件。
 
 > 暂不支持配置文件的动态加载，修改配置文件后，可以使用 `:lsp-restart` 重启来重新加载文件。
 
 ## Completion: snippets
 
-Code snippets 
-兼容 [vscode snippets](https://code.visualstudio.com/docs/editor/userdefinedsnippets) 格式。同样文件后缀支持 全局后缀`.code-snippets` 和 语言包后缀`.json`。
+hx-lsp 的代码片段兼容 [vscode snippets](https://code.visualstudio.com/docs/editor/userdefinedsnippets) 格式。
 
-为了更好的使用 snippet 建议 heliix 合并 [helix#9081 Add a snippet system](https://github.com/helix-editor/helix/pull/9801) 以支持 smart-tab。
+同样文件后缀支持全局后缀`{global_name}.code-snippets` 和语言包后缀`{language_id}.json`。
+
+~~为了更好的使用 snippet 建议 heliix 合并 [helix#9081 Add a snippet system](https://github.com/helix-editor/helix/pull/9801) 以支持 smart-tab。~~
 
 ```svgbob
 .
@@ -87,37 +88,42 @@ Code snippets
     └── markdown.json
 ```
 
-snippet 格式：
+代码片段`snippet`格式：
 
-- **name**: `String` 唯一内容，用于索引
-- **prefix**: `String` 或 `Vec<String>` 提供给 helix 编辑器的补全列表使用
-- **body**: `String` 或 `Vec<String>` 
-- **description**: `Option<String>` 提示内容
+- **name**: `String`: 唯一内容，用于索引。
+- **prefix**: `String` 或 `Vec<String>`: 提供给 helix 编辑器的补全列表使用。
+- **body**: `String` 或 `Vec<String>` : 代码片段。
+- **description**: `Option<String>`: 提示内容。
 
 ```jsonc
 {
-  "markdown a": { // name
-    "prefix": "mda", // string
-    "body": "mda in .helix: ${1:abc} : ${2:cde}", // string
-    "description": "test a info content in .helix"
+  "mdbookNote": {
+    "prefix": "mdbookNote",
+    "body": [
+      "```admonish note ${1:title=\"$2\"}",
+      "${3:content}",
+      "```"
+    ],
+    "description": "mdbook admonish note"
   },
-  "markdown b": {
-    "prefix": [ // array
-      "mdb" 
-    ],
-    "body": "mdb: ${1:abc} : ${2:cde}", // string
-    "description": "test b info content"
+
+  "mdbookBob": {
+    "prefix": "mdbookBob",
+    "body": "```svgbob \n$1\n```",
+    "description": "mdbook svgbob "
   },
-  "markdown c": {
-    "prefix": [ // array
-      "mdc",
-      "mdd"
+  "dir": {
+    "prefix": "dir",
+    "body": [
+      "TM_FILENAME: $TM_FILENAME",
+      "TM_FILENAME_BASE: $TM_FILENAME_BASE",
+      "TM_DIRECTORY: $TM_DIRECTORY",
+      "TM_FILEPATH: ${TM_FILEPATH}",
+      "RELATIVE_FILEPATH: $RELATIVE_FILEPATH",
+      "WORKSPACE_NAME: $WORKSPACE_NAME ",
+      "WORKSPACE_FOLDER: $WORKSPACE_FOLDER "
     ],
-    "body": [ // array
-      "mda: ${1:abc} : ${2:cde}",
-      "test"
-    ],
-    "description": "test c,d info content"
+    "description": "path of current"
   }
 }
 ```
@@ -131,103 +137,101 @@ snippet 格式：
     └── markdown.json
 ````
 
-snippet 格式：
+**Action** 格式：
 
-- **title**: `String` helix 显示条目内容
-- **catch**: `String` 捕捉内容，regex 适配内容的时候，显示 code action
-- **shell**: `String` 或 `Vec<String>` 执行的 shell 脚本
-- **description**: `Option<String>` 提示内容
+- **title**: `String`: 显示条目内容
+- **filter**: `String` 或 `Vec<String>`: Shell 脚本, 参数是选择区域内容以及替换字段`Variables`，当为空或者返回 `true`，`1`的时候则使用该交互Action。
+- **shell**: `String` 或 `Vec<String>`: Shell 脚本，参数是选择区域内容以及替换字段`Variables`，返回字符串则替换选择区域的内容。
+- **description**: `Option<String>`: 提示内容
 
+> 选择区域的内容使用 `Stdio::piped` 传输，在脚本中使用`$(cat)` 捕捉，或者使用替换字段 `$TM_SELECTED_TEXT`。
+
+```jsonc
+/* actions/markdown.json */
+{
+	"bold": {
+		"title": "bold",
+		"filter": "",
+		"shell": ["echo -n \"**${TM_SELECTED_TEXT}**\""],
+		"description": "bold"
+	},
+	"italic": {
+		"title": "italic",
+		"filter": "",
+		"shell": ["echo -n \"_${TM_SELECTED_TEXT}_\""],
+		"description": "italic"
+	}
+}
+```
 
 ```jsonc
 /* actions/go.json */
 {
-  "run main": {
-    "title": "go run main",
-    "catch": "func main",
-    "shell": [
-      "alacritty --hold --working-directory ${TM_DIRECTORY} -e go run ${TM_FILENAME}"
-    ],
-    "description": "go run main"
-  },
-  "run main in tmux": {
-    "title": "tmux: go run main",
-    "catch": "func main",
-    "shell": [
-      "tmux split-window -h -c ${WORKSPACE_FOLDER};",
-      "tmux send 'go build' Enter"
-    ],
-    "description": "go run main"
-  }
+	"run main": {
+		"title": "run main",
+		"filter": "[[ \"$TM_CURRENT_LINE\" == *main* ]] && echo true || echo false",
+		"shell": [
+			"alacritty --hold --working-directory ${TM_DIRECTORY} -e go run ${TM_FILENAME};"
+			"notify-send \"Golang\" \"RUN: ${TM_FILENAME}\""
+		],
+		"description": "go run main"
+	},
+	"run main in tmux": {
+		"title": "tmux: go run main",
+		"filter": "[[ \"$(cat)\" == *main* ]] && echo true || echo false",
+		"shell": [
+			"tmux split-window -h -c ${WORKSPACE_FOLDER}; tmux send 'go run ${TM_FILENAME}' Enter"
+		],
+		"description": "go run main"
+	}
 }
 ```
-
-```json
-/* test */
-{
-  "tmux split window helix": {
-    "title": "tmux split window in project",
-    "catch": "fn",
-    "shell": [
-      "tmux split-window -h",
-      "tmux send \"cd ${WORKSPACE_FOLDER}\n\""
-    ],
-    "description": "tmux split and open helix in project"
-  }
-}
-```
-
-**catch**：
-
-- [x] 捕捉行
-- [ ] 选择内容
-- [ ] 匹配内容
-
 
 ## Variables 字段
 
-计划为 snippet body 和 action shell 支持替换字段处理。
+> [vscode Variables](https://code.visualstudio.com/docs/editor/userdefinedsnippets#_variables)
 
-支持 `$UUID` 和 `${UUID}` 写法。
+
+为 `snippet.body`, `action.filter`, `action.shell` 提供变量字段。
+
+> 支持 `$UUID` 和 `${UUID}` 变量写法。
 
 **path**
 
-- [x] `TM_SELECTED_TEXT`
-- [x] `TM_CURRENT_LINE`
-- [x] `TM_CURRENT_WORD`
-- [x] `TM_LINE_INDEX`
-- [x] `TM_LINE_NUMBER`
-- [x] `TM_FILENAME`
-- [x] `TM_FILENAME_BASE`
-- [x] `TM_DIRECTORY`
-- [x] `TM_FILEPATH`
-- [x] `RELATIVE_FILEPATH`
-- [x] `CLIPBOARD`
-- [x] `WORKSPACE_NAME`
-- [x] `WORKSPACE_FOLDER`
+- [x] `TM_SELECTED_TEXT` 选择区域的内容
+- [x] `TM_CURRENT_LINE` 光标所在行内容
+- [x] `TM_CURRENT_WORD` 光标所在单词内容
+- [x] `TM_LINE_INDEX` 光标所在行基于0索引
+- [x] `TM_LINE_NUMBER` 光标所在行数字
+- [x] `TM_FILENAME` 文件名称
+- [x] `TM_FILENAME_BASE` 文件名称，无扩展名称
+- [x] `TM_DIRECTORY` 当前文档目录
+- [x] `TM_FILEPATH` 当前文档的完整路径
+- [x] `RELATIVE_FILEPATH` 文档的相对路径
+- [x] `CLIPBOARD` 粘贴板内容
+- [x] `WORKSPACE_NAME` 工作区或文件夹名称
+- [x] `WORKSPACE_FOLDER` 工作区或文件夹路径
+- [x] `CURSOR_INDEX` 基于0索引的游标号
+- [x] `CURSOR_NUMBER` 基于一个索引的游标号
 
-**time**
+**时间日期**
 
-- [x] `CURRENT_YEAR`
-- [x] `CURRENT_YEAR_SHORT`
-- [x] `CURRENT_MONTH`
-- [x] `CURRENT_MONTH_NAME`
-- [x] `CURRENT_MONTH_NAME_SHORT`
-- [x] `CURRENT_DATE`
-- [x] `CURRENT_DAY_NAME`
-- [x] `CURRENT_DAY_NAME_SHORT`
-- [x] `CURRENT_HOUR`
-- [x] `CURRENT_MINUTE`
-- [x] `CURRENT_SECOND`
-- [x] `CURRENT_SECONDS_UNIX`
-- [x] `CURRENT_TIMEZONE_OFFSET`
+- [x] `CURRENT_YEAR` 当前年份
+- [x] `CURRENT_YEAR_SHORT`当前年份后两位
+- [x] `CURRENT_MONTH` 当权月份，例如 `02`
+- [x] `CURRENT_MONTH_NAME` 月份名称 例如 `July`
+- [x] `CURRENT_MONTH_NAME_SHORT` 月份名称 例如 `Jul`
+- [x] `CURRENT_DATE` 月份中的日期 `01`
+- [x] `CURRENT_DAY_NAME` 星期名称 `Monday`
+- [x] `CURRENT_DAY_NAME_SHORT` 日期名称 `Mon`
+- [x] `CURRENT_HOUR` 24小时 `01`
+- [x] `CURRENT_MINUTE` 分钟 `01`
+- [x] `CURRENT_SECOND` 秒 `01`
+- [x] `CURRENT_SECONDS_UNIX` Unix开始的秒数
+- [x] `CURRENT_TIMEZONE_OFFSET` UTC时区偏移
 
-**other**
+**随机插入值**
 
-- [x] `RANDOM`
+- [x] `RANDOM` 
 - [x] `RANDOM_HEX`
 - [x] `UUID`
-
-**action catch**
-
-- [ ] `CATCH1..9`

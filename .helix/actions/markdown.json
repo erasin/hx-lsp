@@ -1,8 +1,26 @@
 {
-	"tmux split window helix": {
-		"title": "tmux split window in project",
+	"empty": {
+		"title": "empty",
 		"filter": "echo -n true",
-		"shell": ["echo -n test"],
-		"description": "tmux split and open helix in project"
+		"shell": ["echo -n test11 >> ~/tmp/test.log"],
+		"description": "kind empty"
+	},
+	"rewrite": {
+		"title": "rewrite ",
+		"filter": "echo -n 1",
+		"shell": ["echo -n test ${UUID}"],
+		"description": "replace with test uuid"
+	},
+	"bold": {
+		"title": "bold",
+		"filter": "",
+		"shell": ["echo -n \"**${TM_SELECTED_TEXT}**\""],
+		"description": "bold"
+	},
+	"italic": {
+		"title": "italic",
+		"filter": "",
+		"shell": ["echo -n \"_${TM_SELECTED_TEXT}_\""],
+		"description": "italic"
 	}
 }

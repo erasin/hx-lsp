@@ -1,4 +1,4 @@
-use std::{ops::ControlFlow, time::Duration};
+use std::{collections::HashMap, ops::ControlFlow, time::Duration};
 
 use async_lsp::{
     ClientSocket, LanguageServer, ResponseError,
@@ -12,7 +12,7 @@ use async_lsp::{
         DidOpenTextDocumentParams, DidSaveTextDocumentParams, DocumentColorParams,
         InitializeParams, InitializeResult, SaveOptions, ServerCapabilities,
         TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
-        TextDocumentSyncSaveOptions,
+        TextDocumentSyncSaveOptions, TextEdit, WorkspaceEdit,
     },
     panic::CatchUnwindLayer,
     router::Router,
@@ -32,7 +32,7 @@ use crate::{
     encoding::{get_current_word, is_field},
     state::State,
 };
-use crate::{action::shell_impl, encoding::get_range_content};
+use crate::{action::shell, encoding::get_range_content};
 use crate::{encoding::OffsetEncoding, variables::VariableInit};
 
 /// LSP 服务器
@@ -134,6 +134,10 @@ impl LanguageServer for Server {
                 capabilities: ServerCapabilities {
                     code_action_provider: Some(CodeActionProviderCapability::Options(
                         CodeActionOptions {
+                            code_action_kinds: Some(vec![
+                                CodeActionKind::EMPTY,
+                                CodeActionKind::REFACTOR_REWRITE,
+                            ]),
                             resolve_provider: Some(true),
                             ..Default::default()
                         },
@@ -244,6 +248,7 @@ impl LanguageServer for Server {
                 file_path: uri.to_file_path().unwrap(),
                 work_path: root.clone(),
                 line_pos: params.text_document_position.position.line as usize,
+                cursor_pos: pos.character as usize,
                 line_text: line.to_string(),
                 current_word: cursor_word,
                 selected_text: Default::default(),
@@ -261,31 +266,33 @@ impl LanguageServer for Server {
         params: CodeActionParams,
     ) -> BoxFuture<'static, Result<Option<CodeActionResponse>, ResponseError>> {
         let uri = params.text_document.uri.clone();
-        let range = params.range;
         let state = self.state.clone();
 
         let doc = state.get_contents(&uri);
         let lang_id = state.get_language_id(&uri);
         let root = state.root.clone();
 
+        // 当前行
         let line = doc.get_line(params.range.end.line as usize).unwrap();
+        // 当前 word
         let cursor_word =
             get_current_word(&line, params.range.end.character as usize).unwrap_or_default();
-
-        let actions = Actions::get_lang(lang_id.clone(), &doc, &range, &root);
-
+        // 当前 选择区域
         let range_content =
             get_range_content(&doc, &params.range, OffsetEncoding::Utf8).unwrap_or("".into());
 
         let variable_init = VariableInit {
             file_path: uri.to_file_path().unwrap(),
-            work_path: root,
+            work_path: root.clone(),
             line_pos: params.range.start.line as usize,
+            cursor_pos: params.range.end.character as usize,
             line_text: line.to_string(),
             current_word: cursor_word.to_string(),
             selected_text: range_content.to_string(),
             clipboard: None, // get_clipboard_provider().get_contents().ok(),
         };
+
+        let actions = Actions::get_lang(lang_id.clone(), &variable_init);
 
         let actions = actions
             .to_code_action_items(&variable_init, &params.into())
@@ -300,8 +307,6 @@ impl LanguageServer for Server {
         &mut self,
         params: CodeAction,
     ) -> BoxFuture<'static, Result<CodeAction, ResponseError>> {
-        let cmd = params.clone().command.expect("unknow cmd");
-
         let data: ActionData = serde_json::from_value(params.data.clone().unwrap()).unwrap();
         let uri = data.text_document.uri;
 
@@ -322,12 +327,22 @@ impl LanguageServer for Server {
         // 设置 title 和 tooltip
         let mut resolved_action = params.clone();
 
-        if let Ok(re) = shell_impl(cmd.command.as_str(), &selected) {
-            resolved_action.data = Some(serde_json::to_value(re.clone()).unwrap());
-        }
+        if let Some(output) = data
+            .command
+            .and_then(|cmd| shell(&cmd, &selected).ok())
+            .filter(|o| !o.is_empty())
+        {
+            resolved_action.data = Some(serde_json::to_value(output.clone()).unwrap());
+            let mut changes = HashMap::new();
+            let edits = vec![TextEdit {
+                range: data.range,
+                new_text: output,
+            }];
 
-        resolved_action.kind = Some(CodeActionKind::EMPTY);
-        resolved_action.command = None;
+            changes.insert(uri.clone(), edits);
+            resolved_action.edit = Some(WorkspaceEdit::new(changes));
+            resolved_action.kind = Some(CodeActionKind::REFACTOR_REWRITE);
+        }
 
         Box::pin(async move { Ok(resolved_action) })
     }

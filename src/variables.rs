@@ -15,6 +15,7 @@ pub struct VariableInit {
     pub current_word: String,
     pub selected_text: String,
     pub line_pos: usize,
+    pub cursor_pos: usize,
     pub clipboard: Option<String>,
 }
 
@@ -49,9 +50,9 @@ pub enum Variables {
     /// The path of the opened workspace or folder
     WorkspaceFolder(PathBuf),
     /// The zero-index based cursor number
-    CursorIndex,
+    CursorIndex(usize),
     /// The one-index based cursor number
-    CursorNumber,
+    CursorNumber(usize),
 
     // For inserting the current date and time:
     /// The current year
@@ -117,8 +118,8 @@ impl std::fmt::Display for Variables {
                 Variables::Clipboard(_) => "CLIPBOARD",
                 Variables::WorkspaceName(_) => "WORKSPACE_NAME",
                 Variables::WorkspaceFolder(_) => "WORKSPACE_FOLDER",
-                Variables::CursorIndex => "CURSOR_INDEX",
-                Variables::CursorNumber => "CURSOR_NUMBER",
+                Variables::CursorIndex(_) => "CURSOR_INDEX",
+                Variables::CursorNumber(_) => "CURSOR_NUMBER",
 
                 Variables::CurrentYear => "CURRENT_YEAR",
                 Variables::CurrentYearShort => "CURRENT_YEAR_SHORT",
@@ -173,8 +174,8 @@ impl Variables {
             Variables::Clipboard(init.clipboard.clone().unwrap_or_default()),
             Variables::WorkspaceName(init.work_path.clone()),
             Variables::WorkspaceFolder(init.work_path.clone()),
-            Variables::CursorIndex,
-            Variables::CursorNumber,
+            Variables::CursorIndex(init.cursor_pos),
+            Variables::CursorNumber(init.cursor_pos + 1),
             Variables::CurrentYearShort,
             Variables::CurrentYear,
             Variables::CurrentMonthNameShort,
@@ -204,8 +205,8 @@ impl Variables {
             Variables::TmSelectedText(str) => str.to_string(),
             Variables::TmCurrentLine(str) => str.to_string(),
             Variables::TmCurrentWord(str) => str.to_string(),
-            Variables::TmLineIndex(line_pos) => line_pos.to_string(),
-            Variables::TmLineNumber(line_pos) => line_pos.to_string(),
+            Variables::TmLineIndex(index) => index.to_string(),
+            Variables::TmLineNumber(number) => number.to_string(),
             Variables::TmFilename(file_path) => {
                 file_path.file_name().unwrap().to_str().unwrap().to_string()
             }
@@ -227,12 +228,15 @@ impl Variables {
             Variables::TmFilepath(file_path) => file_path.to_str().unwrap_or("").to_owned(),
             Variables::RelativeFilepath(file_path) => file_path.to_str().unwrap_or("").to_string(),
             Variables::Clipboard(s) => s.to_string(),
-            Variables::WorkspaceName(work_path) => {
-                work_path.file_name().unwrap().to_str().unwrap().to_string()
-            }
+            Variables::WorkspaceName(work_path) => work_path
+                .file_name()
+                .unwrap_or_default()
+                .to_str()
+                .unwrap()
+                .to_string(),
             Variables::WorkspaceFolder(work_path) => work_path.to_str().unwrap_or("").to_string(),
-            Variables::CursorIndex => self.to_string(),
-            Variables::CursorNumber => self.to_string(),
+            Variables::CursorIndex(index) => index.to_string(),
+            Variables::CursorNumber(number) => number.to_string(),
 
             Variables::CurrentYear => OffsetDateTime::now_utc().year().to_string(),
             Variables::CurrentYearShort => time_format("[year repr:last_two]"),
