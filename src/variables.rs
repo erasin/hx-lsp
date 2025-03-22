@@ -150,12 +150,9 @@ impl std::fmt::Display for Variables {
 impl Variables {
     /// 转换字符串内的变量
     pub fn convert_all(text: &str, init: &VariableInit) -> String {
-        let mut text = text.to_owned();
         Variables::to_vec(init)
             .into_iter()
-            .for_each(|f| text = f.convert(&text));
-
-        text
+            .fold(text.to_owned(), |acc, var| var.convert(&acc))
     }
 
     /// 获可支持的字段

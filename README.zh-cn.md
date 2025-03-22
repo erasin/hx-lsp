@@ -235,3 +235,23 @@ hx-lsp 的代码片段兼容 [vscode snippets](https://code.visualstudio.com/doc
 - [x] `RANDOM` 
 - [x] `RANDOM_HEX`
 - [x] `UUID`
+
+## DocumentColor 色彩支持 
+
+- rgb
+	- rgb(255, 255, 255) 支持整数
+	- rgb(2.0, 255.0, 255.0) 支持浮点值
+  - rgb(100%, 0%, 50%) 支持百分比
+- hsl
+	- hsl(240, 50%, 50%) 色相 0-360 度, 饱和度和亮度百分比。
+  - hsl(180, 0.5, 0.5) 浮点值
+- hsv
+	- hsv(300, 100%, 100%) 色相 0-360 度, 饱和度和明度百分比。
+  - hsv(180, 0.5, 0.5) 浮点值
+
+## bevy color
+
+- rgba(1.0, 0.0, 0.0, 0.5)
+- srgb(1.0,0.0,0.0)
+- srgba(1.0, 0.0, 0.0, 0.8)
+

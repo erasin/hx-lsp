@@ -177,7 +177,7 @@ impl LanguageServer for Server {
         let content = Rope::from(params.text_document.text);
         let language_id = params.text_document.language_id;
 
-        self.state.upsert_file(&uri, content, Some(language_id));
+        self.state.open_file(&uri, content, Some(language_id));
 
         ControlFlow::Continue(())
     }
@@ -200,9 +200,7 @@ impl LanguageServer for Server {
 
     fn did_close(&mut self, params: DidCloseTextDocumentParams) -> Self::NotifyResult {
         let uri = params.text_document.uri;
-
-        self.state.remove_file(&uri.clone());
-
+        self.state.clean_file(&uri);
         ControlFlow::Continue(())
     }
 
@@ -215,50 +213,48 @@ impl LanguageServer for Server {
         let doc = self.state.get_contents(&uri);
         let lang_id = self.state.get_language_id(&uri);
         let root = self.state.root.clone();
-        Box::pin(async move {
-            let snippets = [
-                Snippets::get_lang(lang_id.clone(), &root),
-                Snippets::get_global(&root),
-            ]
-            .into_iter()
-            .fold(Snippets::default(), |mut lang, other| {
-                lang.extend(other);
-                lang
-            });
+        let snippets = [
+            Snippets::get_lang(lang_id.clone(), &root),
+            Snippets::get_global(&root),
+        ]
+        .into_iter()
+        .fold(Snippets::default(), |mut lang, other| {
+            lang.extend(other);
+            lang
+        });
 
-            let line = doc.get_line(pos.line as usize).unwrap();
+        let line = doc.get_line(pos.line as usize).unwrap();
 
-            if is_field(&line, pos.character as usize) {
-                return Ok(None);
+        if is_field(&line, pos.character as usize) {
+            return Box::pin(async move { Ok(None) });
+        }
+
+        let mut cursor_word = String::new();
+
+        let snippets = match get_current_word(&line, pos.character as usize) {
+            Some(word) => {
+                cursor_word = word.to_string();
+                snippets.filter(word).ok().unwrap()
             }
+            None => snippets,
+        };
 
-            let mut cursor_word = String::new();
+        let mut clipboard_ctx = ClipboardContext::new().unwrap();
 
-            let snippets = match get_current_word(&line, pos.character as usize) {
-                Some(word) => {
-                    cursor_word = word.to_string();
-                    snippets.filter(word).ok().unwrap()
-                }
-                None => snippets,
-            };
+        let variable_init = VariableInit {
+            file_path: uri.to_file_path().unwrap(),
+            work_path: root.clone(),
+            line_pos: params.text_document_position.position.line as usize,
+            cursor_pos: pos.character as usize,
+            line_text: line.to_string(),
+            current_word: cursor_word,
+            selected_text: Default::default(),
+            clipboard: clipboard_ctx.get_contents().ok(),
+        };
 
-            let mut ctx = ClipboardContext::new().unwrap();
+        let items = snippets.to_completion_items(&variable_init);
 
-            let variable_init = VariableInit {
-                file_path: uri.to_file_path().unwrap(),
-                work_path: root.clone(),
-                line_pos: params.text_document_position.position.line as usize,
-                cursor_pos: pos.character as usize,
-                line_text: line.to_string(),
-                current_word: cursor_word,
-                selected_text: Default::default(),
-                clipboard: ctx.get_contents().ok(),
-            };
-
-            let items = snippets.to_completion_items(&variable_init);
-
-            Ok(Some(CompletionResponse::Array(items)))
-        })
+        Box::pin(async move { Ok(Some(CompletionResponse::Array(items))) })
     }
 
     fn code_action(
@@ -281,6 +277,8 @@ impl LanguageServer for Server {
         let range_content =
             get_range_content(&doc, &params.range, OffsetEncoding::Utf8).unwrap_or("".into());
 
+        let mut clipboard_ctx = ClipboardContext::new().unwrap();
+
         let variable_init = VariableInit {
             file_path: uri.to_file_path().unwrap(),
             work_path: root.clone(),
@@ -289,7 +287,7 @@ impl LanguageServer for Server {
             line_text: line.to_string(),
             current_word: cursor_word.to_string(),
             selected_text: range_content.to_string(),
-            clipboard: None, // get_clipboard_provider().get_contents().ok(),
+            clipboard: clipboard_ctx.get_contents().ok(),
         };
 
         let actions = Actions::get_lang(lang_id.clone(), &variable_init);
@@ -353,7 +351,19 @@ impl LanguageServer for Server {
     ) -> BoxFuture<'static, Result<Vec<ColorInformation>, ResponseError>> {
         let uri = params.text_document.uri;
         let doc = self.state.get_contents(&uri);
-        let colors = extract_colors(&doc);
+
+        let current_hash = self.state.calculate_content_hash(&uri);
+
+        // 尝试获取缓存
+        let colors = if let Some(cached_colors) = self.state.get_cached_colors(&uri, current_hash) {
+            cached_colors
+        } else {
+            // 缓存处理
+            let colors = extract_colors(&doc);
+            self.state
+                .update_color_cache(&uri, current_hash, colors.clone());
+            colors
+        };
 
         Box::pin(async move { Ok(colors) })
     }
