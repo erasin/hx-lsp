@@ -8,6 +8,8 @@ use std::{
 };
 use tracing::debug;
 
+use crate::encoding::{OffsetEncoding, lsp_pos_to_pos};
+
 #[derive(Default, Clone)]
 pub struct State {
     pub root: PathBuf,
@@ -186,6 +188,8 @@ impl State {
 }
 
 // convert lsp position to Rope position
-pub(crate) fn position_to_char_index(rope: &Rope, position: Position) -> usize {
-    rope.line_to_char(position.line as usize) + (position.character as usize)
+pub(crate) fn position_to_char_index(doc: &Rope, position: Position) -> usize {
+    // rope.line_to_char(position.line as usize) + (position.character as usize)
+    let offset_encoding = OffsetEncoding::Utf16;
+    lsp_pos_to_pos(doc, position, offset_encoding).unwrap()
 }

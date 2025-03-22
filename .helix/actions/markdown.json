@@ -2,7 +2,7 @@
 	"empty": {
 		"title": "empty",
 		"filter": "echo -n true",
-		"shell": ["echo -n test11 >> ~/tmp/test.log"],
+		"shell": ["echo -n \"${TM_SELECTED_TEXT}\" >> ~/tmp/test.log"],
 		"description": "kind empty"
 	},
 	"rewrite": {

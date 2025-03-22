@@ -246,11 +246,10 @@ fn parse_rgb_like(text: &str, prefix: &str, length: usize, max_values: &[f32]) -
     })
 }
 
-fn parse_hsl_hsv_like(text: &str, prefix: &str) -> Option<Vec<f32>> {
+fn parse_hsl_hsv_like(text: &str, prefix: &str, length: usize) -> Option<Vec<f32>> {
     let content = text.strip_prefix(prefix)?.strip_suffix(')')?;
     let parts: Vec<&str> = content.split(',').map(|s| s.trim()).collect();
-    let length = parts.len();
-    if ![3, 4].contains(&length) {
+    if parts.len() != length {
         return None;
     }
 
@@ -269,7 +268,7 @@ fn parse_hsl_hsv_like(text: &str, prefix: &str) -> Option<Vec<f32>> {
 
 // bevy hsla 支持
 fn parse_hsla(text: &str) -> Option<Color> {
-    let components = parse_hsl_hsv_like(text, "hsla(")?;
+    let components = parse_hsl_hsv_like(text, "hsla(", 4)?;
     // 转换HSL到RGB
     let (red, green, blue) = hsl_to_rgb(components[0], components[1], components[2]);
     Some(Color {
@@ -282,7 +281,7 @@ fn parse_hsla(text: &str) -> Option<Color> {
 
 // 新增HSL解析函数
 fn parse_hsl(text: &str) -> Option<Color> {
-    let components = parse_hsl_hsv_like(text, "hsl(")?;
+    let components = parse_hsl_hsv_like(text, "hsl(", 3)?;
     // 转换HSL到RGB
     let (red, green, blue) = hsl_to_rgb(components[0], components[1], components[2]);
     Some(Color {
@@ -313,7 +312,7 @@ fn hsl_to_rgb(h: f32, s: f32, l: f32) -> (f32, f32, f32) {
 
 // bevy hsva 支持
 fn parse_hsva(text: &str) -> Option<Color> {
-    let components = parse_hsl_hsv_like(text, "hsva(")?;
+    let components = parse_hsl_hsv_like(text, "hsva(", 4)?;
     // 转换HSV到RGB
     let (red, green, blue) = hsv_to_rgb(components[0], components[1], components[2]);
     Some(Color {
@@ -326,7 +325,7 @@ fn parse_hsva(text: &str) -> Option<Color> {
 
 // 新增 HSV 解析函数
 fn parse_hsv(text: &str) -> Option<Color> {
-    let components = parse_hsl_hsv_like(text, "hsv(")?;
+    let components = parse_hsl_hsv_like(text, "hsv(", 3)?;
     // 转换HSV到RGB
     let (red, green, blue) = hsv_to_rgb(components[0], components[1], components[2]);
     Some(Color {

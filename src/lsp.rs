@@ -10,7 +10,7 @@ use async_lsp::{
         ColorProviderCapability, CompletionOptions, CompletionParams, CompletionResponse,
         DidChangeConfigurationParams, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
         DidOpenTextDocumentParams, DidSaveTextDocumentParams, DocumentColorParams,
-        InitializeParams, InitializeResult, SaveOptions, ServerCapabilities,
+        InitializeParams, InitializeResult, PositionEncodingKind, SaveOptions, ServerCapabilities,
         TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
         TextDocumentSyncSaveOptions, TextEdit, WorkspaceEdit,
     },
@@ -25,6 +25,7 @@ use ropey::Rope;
 use tower::ServiceBuilder;
 use tracing::{Level, info};
 
+use crate::variables::VariableInit;
 use crate::{action::ActionData, snippet::Snippets};
 use crate::{
     action::Actions,
@@ -33,7 +34,6 @@ use crate::{
     state::State,
 };
 use crate::{action::shell, encoding::get_range_content};
-use crate::{encoding::OffsetEncoding, variables::VariableInit};
 
 /// LSP 服务器
 pub struct Server {
@@ -132,6 +132,7 @@ impl LanguageServer for Server {
         Box::pin(async move {
             Ok(InitializeResult {
                 capabilities: ServerCapabilities {
+                    position_encoding: Some(PositionEncodingKind::UTF16),
                     code_action_provider: Some(CodeActionProviderCapability::Options(
                         CodeActionOptions {
                             code_action_kinds: Some(vec![
@@ -274,8 +275,7 @@ impl LanguageServer for Server {
         let cursor_word =
             get_current_word(&line, params.range.end.character as usize).unwrap_or_default();
         // 当前 选择区域
-        let range_content =
-            get_range_content(&doc, &params.range, OffsetEncoding::Utf8).unwrap_or("".into());
+        let range_content = get_range_content(&doc, &params.range).unwrap_or("".into());
 
         let mut clipboard_ctx = ClipboardContext::new().unwrap();
 
@@ -314,9 +314,7 @@ impl LanguageServer for Server {
             let doc = state.get_contents(&uri);
             // let lang_id = state.get_language_id(&uri);
             // let root = state.root.clone();
-            let range_content = get_range_content(&doc, &range, OffsetEncoding::Utf8)
-                .unwrap_or("".into())
-                .into();
+            let range_content = get_range_content(&doc, &range).unwrap_or("".into()).into();
             Some(range_content)
         } else {
             None

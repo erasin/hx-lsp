@@ -41,7 +41,7 @@ impl Action {
         data: &ActionData,
     ) -> Option<CodeAction> {
         let shell = self.shell.to_string();
-        let shell = Variables::convert_all(&shell, variable_init);
+        let shell = Variables::replace_all(&shell, variable_init);
 
         let action = CodeAction {
             title: self.title.clone(),
@@ -182,7 +182,7 @@ impl Actions {
                 }
 
                 let shell_script = action.filter.to_string();
-                let shell_script = Variables::convert_all(&shell_script, init);
+                let shell_script = Variables::replace_all(&shell_script, init);
 
                 let filter = match shell(&shell_script, &Some(init.selected_text.clone())) {
                     Ok(s) => matches!(s.to_lowercase().as_str(), "true" | "1"),

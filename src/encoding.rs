@@ -51,8 +51,8 @@ pub fn lsp_pos_to_pos(
 pub fn apply_content_change(
     doc: &mut Rope,
     change: &TextDocumentContentChangeEvent,
-    offset_encoding: OffsetEncoding,
 ) -> Result<(), Error> {
+    let offset_encoding = OffsetEncoding::Utf16;
     match change.range {
         Some(range) => {
             assert!(
@@ -130,11 +130,8 @@ pub fn get_current_word<'a>(line: &'a RopeSlice, line_character_pos: usize) -> O
 }
 
 /// 获取内容
-pub fn get_range_content<'a>(
-    doc: &'a Rope,
-    range: &Range,
-    offset_encoding: OffsetEncoding,
-) -> Option<RopeSlice<'a>> {
+pub fn get_range_content<'a>(doc: &'a Rope, range: &Range) -> Option<RopeSlice<'a>> {
+    let offset_encoding = OffsetEncoding::Utf16;
     if range.start > range.end {
         return None;
     }
@@ -175,9 +172,33 @@ pub fn char_is_word(ch: char) -> bool {
 #[cfg(test)]
 mod test {
 
-    use crate::encoding::char_is_punctuation;
+    use async_lsp::lsp_types::{Position, Range};
+    use ropey::Rope;
+
+    use crate::encoding::{char_is_punctuation, get_range_content};
 
     use super::get_current_word;
+
+    #[test]
+    fn test_get_range_content() {
+        let cases = [
+            ("你好世界", (0, 0, 0, 2), "你好"),
+            ("你好世界", (0, 2, 0, 4), "世界"),
+        ];
+
+        for (input, range, expected) in cases {
+            let result = get_range_content(
+                &Rope::from_str(input),
+                &Range::new(
+                    Position::new(range.0, range.1),
+                    Position::new(range.2, range.3),
+                ),
+            )
+            .and_then(|f| Some(f.to_string()))
+            .unwrap_or_default();
+            assert_eq!(result, expected, "{input}:\n {result} != {expected}")
+        }
+    }
 
     #[test]
     fn test_get_last() {

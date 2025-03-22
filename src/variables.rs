@@ -1,11 +1,20 @@
-use std::{path::PathBuf, sync::OnceLock};
-
-use aho_corasick::AhoCorasick;
-use rand::distributions::{Distribution, Uniform};
-use time::{OffsetDateTime, UtcOffset, format_description};
+use aho_corasick::{AhoCorasick, PatternID};
+use parking_lot::Mutex;
+use rand::Rng;
+use std::{collections::HashMap, path::PathBuf, sync::OnceLock};
+use time::{
+    OffsetDateTime, UtcOffset,
+    format_description::{self, BorrowedFormatItem, OwnedFormatItem},
+};
 use uuid::Uuid;
 
 use crate::encoding::char_is_word;
+
+pub fn init() {
+    init_time_offset();
+    init_time_formats();
+    init_variable_automaton();
+}
 
 #[derive(Debug, Default)]
 pub struct VariableInit {
@@ -22,80 +31,44 @@ pub struct VariableInit {
 /// 兼容 [vscode snippet variables](https://code.visualstudio.com/docs/editor/userdefinedsnippets#_variables)
 #[derive(Debug, Clone)]
 pub enum Variables {
-    // The following variables can be used:
-    /// The currently selected text or the empty string
-    TmSelectedText(String),
-    /// The contents of the current line
-    TmCurrentLine(String),
-    /// The contents of the word under cursor or the empty string
-    TmCurrentWord(String),
-    /// The zero-index based line number
-    TmLineIndex(usize),
-    /// The one-index based line number
-    TmLineNumber(usize),
-    /// The filename of the current document
-    TmFilename(PathBuf),
-    /// The filename of the current document without its extensions
-    TmFilenameBase(PathBuf),
-    /// The directory of the current document
-    TmDirectory(PathBuf),
-    /// The full file path of the current document
-    TmFilepath(PathBuf),
-    /// The relative (to the opened workspace or folder) file path of the current document
-    RelativeFilepath(PathBuf),
-    /// The contents of your clipboard
-    Clipboard(String),
-    /// The name of the opened workspace or folder
-    WorkspaceName(PathBuf),
-    /// The path of the opened workspace or folder
-    WorkspaceFolder(PathBuf),
-    /// The zero-index based cursor number
-    CursorIndex(usize),
-    /// The one-index based cursor number
-    CursorNumber(usize),
+    TmSelectedText,
+    TmCurrentLine,
+    TmCurrentWord,
+    TmLineIndex,
+    TmLineNumber,
+    TmFilename,
+    TmFilenameBase,
+    TmDirectory,
+    TmFilepath,
+    RelativeFilepath,
+    Clipboard,
+    WorkspaceName,
+    WorkspaceFolder,
+    CursorIndex,
+    CursorNumber,
 
-    // For inserting the current date and time:
-    /// The current year
     CurrentYear,
-    /// The current year's last two digits
     CurrentYearShort,
-    /// The month as two digits (example '02')
     CurrentMonth,
-    /// The full name of the month (example 'July')
     CurrentMonthName,
-    /// The short name of the month (example 'Jul')
     CurrentMonthNameShort,
-    /// The day of the month as two digits (example '08')
     CurrentDate,
-    /// The name of day (example 'Monday')
     CurrentDayName,
-    /// The short name of the day (example 'Mon')
     CurrentDayNameShort,
-    /// The current hour in 24-hour clock format
     CurrentHour,
-    /// The current minute as two digits
     CurrentMinute,
-    /// The current second as two digits
     CurrentSecond,
-    /// The number of seconds since the Unix epoch
     CurrentSecondsUnix,
-    /// The current UTC time zone offset as +HH:MM or -HH:MM (example -07:00).
     CurrentTimezoneOffset,
 
-    // For inserting random values:
-    /// 6 random Base-10 digits
+    // 时间
     Random,
-    /// 6 random Base-16 digits
     RandomHex,
-    /// A Version 4 UUID
     Uuid,
 
-    // For inserting line or block comments, honoring the current language:
-    /// Example output: in PHP /* or in HTML <!--
+    // 注释
     BlockCommentStart,
-    /// Example output: in PHP */ or in HTML -->
     BlockCommentEnd,
-    /// Example output: in PHP `//`
     LineComment,
 }
 
@@ -105,21 +78,21 @@ impl std::fmt::Display for Variables {
             f,
             "{}",
             match self {
-                Variables::TmSelectedText(_) => "TM_SELECTED_TEXT",
-                Variables::TmCurrentLine(_) => "TM_CURRENT_LINE",
-                Variables::TmCurrentWord(_) => "TM_CURRENT_WORD",
-                Variables::TmLineIndex(_) => "TM_LINE_INDEX",
-                Variables::TmLineNumber(_) => "TM_LINE_NUMBER",
-                Variables::TmFilename(_) => "TM_FILENAME",
-                Variables::TmFilenameBase(_) => "TM_FILENAME_BASE",
-                Variables::TmDirectory(_) => "TM_DIRECTORY",
-                Variables::TmFilepath(_) => "TM_FILEPATH",
-                Variables::RelativeFilepath(_) => "RELATIVE_FILEPATH",
-                Variables::Clipboard(_) => "CLIPBOARD",
-                Variables::WorkspaceName(_) => "WORKSPACE_NAME",
-                Variables::WorkspaceFolder(_) => "WORKSPACE_FOLDER",
-                Variables::CursorIndex(_) => "CURSOR_INDEX",
-                Variables::CursorNumber(_) => "CURSOR_NUMBER",
+                Variables::TmSelectedText => "TM_SELECTED_TEXT",
+                Variables::TmCurrentLine => "TM_CURRENT_LINE",
+                Variables::TmCurrentWord => "TM_CURRENT_WORD",
+                Variables::TmLineIndex => "TM_LINE_INDEX",
+                Variables::TmLineNumber => "TM_LINE_NUMBER",
+                Variables::TmFilename => "TM_FILENAME",
+                Variables::TmFilenameBase => "TM_FILENAME_BASE",
+                Variables::TmDirectory => "TM_DIRECTORY",
+                Variables::TmFilepath => "TM_FILEPATH",
+                Variables::RelativeFilepath => "RELATIVE_FILEPATH",
+                Variables::Clipboard => "CLIPBOARD",
+                Variables::WorkspaceName => "WORKSPACE_NAME",
+                Variables::WorkspaceFolder => "WORKSPACE_FOLDER",
+                Variables::CursorIndex => "CURSOR_INDEX",
+                Variables::CursorNumber => "CURSOR_NUMBER",
 
                 Variables::CurrentYear => "CURRENT_YEAR",
                 Variables::CurrentYearShort => "CURRENT_YEAR_SHORT",
@@ -148,211 +121,297 @@ impl std::fmt::Display for Variables {
 }
 
 impl Variables {
-    /// 转换字符串内的变量
-    pub fn convert_all(text: &str, init: &VariableInit) -> String {
-        Variables::to_vec(init)
-            .into_iter()
-            .fold(text.to_owned(), |acc, var| var.convert(&acc))
-    }
-
-    /// 获可支持的字段
-    fn to_vec(init: &VariableInit) -> Vec<Variables> {
+    /// 获取所有支持的变量类型
+    fn all() -> impl Iterator<Item = Self> {
+        use Variables::*;
         [
-            Variables::TmSelectedText(init.selected_text.clone()),
-            Variables::TmCurrentLine(init.line_text.clone()),
-            Variables::TmCurrentWord(init.current_word.clone()),
-            Variables::TmLineIndex(init.line_pos),
-            Variables::TmLineNumber(init.line_pos + 1),
-            Variables::TmFilenameBase(init.file_path.clone()),
-            Variables::TmFilename(init.file_path.clone()),
-            Variables::TmDirectory(init.file_path.clone()),
-            Variables::TmFilepath(init.file_path.clone()),
-            Variables::RelativeFilepath(init.file_path.clone()),
-            Variables::Clipboard(init.clipboard.clone().unwrap_or_default()),
-            Variables::WorkspaceName(init.work_path.clone()),
-            Variables::WorkspaceFolder(init.work_path.clone()),
-            Variables::CursorIndex(init.cursor_pos),
-            Variables::CursorNumber(init.cursor_pos + 1),
-            Variables::CurrentYearShort,
-            Variables::CurrentYear,
-            Variables::CurrentMonthNameShort,
-            Variables::CurrentMonthName,
-            Variables::CurrentMonth,
-            Variables::CurrentDate,
-            Variables::CurrentDayNameShort,
-            Variables::CurrentDayName,
-            Variables::CurrentHour,
-            Variables::CurrentMinute,
-            Variables::CurrentSecond,
-            Variables::CurrentSecondsUnix,
-            Variables::CurrentTimezoneOffset,
-            Variables::Random,
-            Variables::RandomHex,
-            Variables::Uuid,
-            // Variables::BlockCommentStart,
-            // Variables::BlockCommentEnd,
-            // Variables::LineComment,
+            // 基础变量
+            TmSelectedText,
+            TmCurrentLine,
+            TmCurrentWord,
+            TmLineIndex,
+            TmLineNumber,
+            TmFilename,
+            TmFilenameBase,
+            TmDirectory,
+            TmFilepath,
+            RelativeFilepath,
+            Clipboard,
+            WorkspaceName,
+            WorkspaceFolder,
+            CursorIndex,
+            CursorNumber,
+            // 时间相关
+            CurrentYear,
+            CurrentYearShort,
+            CurrentMonth,
+            CurrentMonthName,
+            CurrentMonthNameShort,
+            CurrentDate,
+            CurrentDayName,
+            CurrentDayNameShort,
+            CurrentHour,
+            CurrentMinute,
+            CurrentSecond,
+            CurrentSecondsUnix,
+            CurrentTimezoneOffset,
+            // 随机值
+            Random,
+            RandomHex,
+            Uuid,
+            // 注释
+            BlockCommentStart,
+            BlockCommentEnd,
+            LineComment,
         ]
-        .to_vec()
+        .into_iter()
     }
 
-    /// 转化的内容
-    fn to_value(&self) -> String {
+    /// 解析变量值
+    pub(crate) fn resolve(&self, init: &VariableInit) -> String {
         match self {
-            Variables::TmSelectedText(str) => str.to_string(),
-            Variables::TmCurrentLine(str) => str.to_string(),
-            Variables::TmCurrentWord(str) => str.to_string(),
-            Variables::TmLineIndex(index) => index.to_string(),
-            Variables::TmLineNumber(number) => number.to_string(),
-            Variables::TmFilename(file_path) => {
-                file_path.file_name().unwrap().to_str().unwrap().to_string()
-            }
-            Variables::TmFilenameBase(file_path) => file_path
-                .file_name()
-                .unwrap()
-                .to_str()
-                .unwrap()
-                .to_string()
-                .chars()
-                .take_while(|&ch| char_is_word(ch))
-                .collect(),
-            Variables::TmDirectory(file_path) => file_path
-                .parent()
-                .unwrap()
-                .to_str()
-                .unwrap_or("")
-                .to_owned(),
-            Variables::TmFilepath(file_path) => file_path.to_str().unwrap_or("").to_owned(),
-            Variables::RelativeFilepath(file_path) => file_path.to_str().unwrap_or("").to_string(),
-            Variables::Clipboard(s) => s.to_string(),
-            Variables::WorkspaceName(work_path) => work_path
-                .file_name()
-                .unwrap_or_default()
-                .to_str()
-                .unwrap()
-                .to_string(),
-            Variables::WorkspaceFolder(work_path) => work_path.to_str().unwrap_or("").to_string(),
-            Variables::CursorIndex(index) => index.to_string(),
-            Variables::CursorNumber(number) => number.to_string(),
+            // 基础变量
+            Self::TmSelectedText => init.selected_text.clone(),
+            Self::TmCurrentLine => init.line_text.clone(),
+            Self::TmCurrentWord => init.current_word.clone(),
+            Self::TmLineIndex => init.line_pos.to_string(),
+            Self::TmLineNumber => (init.line_pos + 1).to_string(),
+            Self::TmFilename => file_name(&init.file_path),
+            Self::TmFilenameBase => file_name_base(&init.file_path),
+            Self::TmDirectory => file_directory(&init.file_path),
+            Self::TmFilepath => path_to_str(&init.file_path),
+            Self::RelativeFilepath => path_to_str(&init.file_path), // TODO: 实现相对路径
+            Self::Clipboard => init.clipboard.clone().unwrap_or_default(),
+            Self::WorkspaceName => file_name(&init.work_path),
+            Self::WorkspaceFolder => path_to_str(&init.work_path),
+            Self::CursorIndex => init.cursor_pos.to_string(),
+            Self::CursorNumber => (init.cursor_pos + 1).to_string(),
 
-            Variables::CurrentYear => OffsetDateTime::now_utc().year().to_string(),
-            Variables::CurrentYearShort => time_format("[year repr:last_two]"),
-            Variables::CurrentMonth => time_format("[month]"),
-            Variables::CurrentMonthName => time_format("[month repr:long]"),
-            Variables::CurrentMonthNameShort => time_format("[month repr:short]"),
-            Variables::CurrentDate => time_format("[day]"),
-            Variables::CurrentDayName => time_format("[weekday repr:long]"),
-            Variables::CurrentDayNameShort => time_format("[weekday repr:short]"),
-            Variables::CurrentHour => time_format("[hour repr:24]"),
-            Variables::CurrentMinute => time_format("[minute]"),
-            Variables::CurrentSecond => time_format("[second]"),
-            Variables::CurrentSecondsUnix => time_format("[unix_timestamp precision:nanosecond]"),
-            Variables::CurrentTimezoneOffset => OffsetDateTime::now_utc().offset().to_string(),
+            // 时间相关
+            Self::CurrentYear => time_format(&self.to_string()),
+            Self::CurrentYearShort => time_format(&self.to_string()),
+            Self::CurrentMonth => time_format(&self.to_string()),
+            Self::CurrentMonthName => time_format(&self.to_string()),
+            Self::CurrentMonthNameShort => time_format(&self.to_string()),
+            Self::CurrentDate => time_format(&self.to_string()),
+            Self::CurrentDayName => time_format(&self.to_string()),
+            Self::CurrentDayNameShort => time_format(&self.to_string()),
+            Self::CurrentHour => time_format(&self.to_string()),
+            Self::CurrentMinute => time_format(&self.to_string()),
+            Self::CurrentSecond => time_format(&self.to_string()),
+            Self::CurrentSecondsUnix => time_format(&self.to_string()),
+            Self::CurrentTimezoneOffset => current_timezone_offset(),
 
-            Variables::Random => random(),
-            Variables::RandomHex => random_hex(),
-            Variables::Uuid => Uuid::new_v4().to_string(),
+            // 随机值
+            Self::Random => random_base10(6),
+            Self::RandomHex => random_hex(6),
+            Self::Uuid => Uuid::new_v4().to_string(),
 
-            Variables::BlockCommentStart => self.to_string(),
-            Variables::BlockCommentEnd => self.to_string(),
-            Variables::LineComment => self.to_string(),
+            // 注释（需要语言上下文）
+            Self::BlockCommentStart => self.to_string(), // 示例值，需根据语言调整
+            Self::BlockCommentEnd => self.to_string(),
+            Self::LineComment => self.to_string(),
         }
     }
 
-    /// 替换处理
-    pub fn convert(&self, text: &String) -> String {
-        let str = self.to_string();
-        let str_replace = self.to_value();
-        if str_replace.is_empty() {
-            return text.clone();
+    /// 批量替换文本中的变量
+    pub fn replace_all(text: &str, init: &VariableInit) -> String {
+        let automaton = init_variable_automaton();
+        let mut replacements = Vec::new();
+
+        for mat in automaton.find_iter(text) {
+            let var = match Self::from_pattern_id(mat.pattern()) {
+                Some(v) => v,
+                None => continue,
+            };
+            let replacement = var.resolve(init);
+            replacements.push((mat.range(), replacement));
         }
 
-        let patterns = &[format!("${str}"), format!("${{{str}}}")];
-        let replace_with = &[str_replace.to_owned(), str_replace];
+        build_replaced_string(text, replacements)
+    }
 
-        let ac = AhoCorasick::builder()
-            .ascii_case_insensitive(true)
-            .build(patterns)
-            .unwrap();
-
-        ac.try_replace_all(text, replace_with)
-            .unwrap_or(text.to_owned())
+    /// 从模式ID解析变量类型
+    fn from_pattern_id(id: PatternID) -> Option<Self> {
+        let index = id.as_usize() / 2; // 每个变量有2个模式
+        Self::all().nth(index)
     }
 }
 
-pub fn get_time_offset() -> &'static UtcOffset {
+/// 构建替换后的字符串（无锁操作）
+fn build_replaced_string(
+    text: &str,
+    replacements: Vec<(std::ops::Range<usize>, String)>,
+) -> String {
+    let mut result = String::with_capacity(text.len());
+    let mut last_end = 0;
+
+    for (range, replacement) in replacements {
+        result.push_str(&text[last_end..range.start]);
+        result.push_str(&replacement);
+        last_end = range.end;
+    }
+
+    result.push_str(&text[last_end..]);
+    result
+}
+
+/// 初始化时区偏移
+fn init_time_offset() -> &'static UtcOffset {
+    // 时区偏移缓存
     // time local offset not support multi-thread
     static TIME_OFFSET: OnceLock<UtcOffset> = OnceLock::new();
 
     TIME_OFFSET.get_or_init(|| {
         OffsetDateTime::now_local()
-            .unwrap_or(OffsetDateTime::now_utc())
+            .unwrap_or_else(|_| OffsetDateTime::now_utc())
             .offset()
     })
 }
 
-pub fn time_format(s: &str) -> String {
-    match time_format_parse(s) {
-        Ok(s) => s,
-        Err(_e) => s.to_owned(),
+/// 初始化时间格式缓存
+fn init_time_formats() -> &'static Mutex<HashMap<&'static str, Vec<OwnedFormatItem>>> {
+    // 时间格式
+    static TIME_FORMAT_CACHE: OnceLock<Mutex<HashMap<&'static str, Vec<OwnedFormatItem>>>> =
+        OnceLock::new();
+    TIME_FORMAT_CACHE.get_or_init(|| {
+        let mut map = HashMap::new();
+        let formats = [
+            ("CURRENT_YEAR", "[year]"),
+            ("CURRENT_YEAR_SHORT", "[year repr:last_two]"),
+            ("CURRENT_MONTH", "[month]"),
+            ("CURRENT_MONTH_NAME", "[month repr:long]"),
+            ("CURRENT_MONTH_NAME_SHORT", "[month repr:short]"),
+            ("CURRENT_DATE", "[day]"),
+            ("CURRENT_DAY_NAME", "[weekday repr:long]"),
+            ("CURRENT_DAY_NAME_SHORT", "[weekday repr:short]"),
+            ("CURRENT_HOUR", "[hour repr:24]"),
+            ("CURRENT_MINUTE", "[minute]"),
+            ("CURRENT_SECOND", "[second]"),
+            (
+                "CURRENT_SECONDS_UNIX",
+                "[unix_timestamp precision:nanosecond]",
+            ),
+        ];
+
+        for (key, fmt) in formats {
+            if let Ok(parsed) = format_description::parse(fmt) {
+                // 转换为拥有所有权的格式项
+                let v = convert_to_owned(parsed);
+                map.insert(key, v);
+            }
+        }
+        Mutex::new(map)
+    })
+}
+
+/// 将 BorrowedFormatItem 转换为 OwnedFormatItem
+fn convert_to_owned<'a>(items: Vec<BorrowedFormatItem<'a>>) -> Vec<OwnedFormatItem> {
+    items.iter().map(|item| item.into()).collect()
+}
+
+/// 获取当前时间（带缓存时区）
+fn current_time() -> OffsetDateTime {
+    OffsetDateTime::now_utc().to_offset(*init_time_offset())
+}
+
+fn current_timezone_offset() -> String {
+    current_time().offset().to_string()
+}
+
+fn time_format(fmt: &str) -> String {
+    let cache = init_time_formats();
+    let lock = cache.lock();
+
+    if let Some(format) = lock.get(fmt) {
+        // 使用 OwnedFormatItem 进行格式化
+        current_time()
+            .format(&format)
+            .unwrap_or_else(|_| String::from(fmt))
+    } else {
+        fmt.to_owned()
     }
 }
 
-pub fn time_format_parse(s: &str) -> Result<String, Box<dyn std::error::Error>> {
-    let format = format_description::parse(s)?;
+/// 初始化变量自动机
+fn init_variable_automaton() -> &'static AhoCorasick {
+    // 变量自动机缓存
+    static VARIABLE_AUTOMATON: OnceLock<AhoCorasick> = OnceLock::new();
 
-    let s = OffsetDateTime::now_utc()
-        .to_offset(*get_time_offset())
-        .format(&format)?;
+    VARIABLE_AUTOMATON.get_or_init(|| {
+        let patterns: Vec<String> = Variables::all()
+            .flat_map(|var| [format!("${var}"), format!("${{{var}}}")])
+            .collect();
 
-    Ok(s)
+        AhoCorasick::builder()
+            .ascii_case_insensitive(true)
+            .match_kind(aho_corasick::MatchKind::LeftmostLongest)
+            .build(patterns)
+            .expect("Failed to build Aho-Corasick automaton")
+    })
 }
 
-fn random() -> String {
-    let step = Uniform::new(0, 9);
-    let mut rng = rand::thread_rng();
-    step.sample_iter(&mut rng)
-        .take(6)
-        .map(|f| f.to_string())
+/// 生成指定位数的随机数
+fn random_base10(len: usize) -> String {
+    let mut rng = rand::rng();
+    (0..len)
+        .map(|_| rng.random_range(0..=9).to_string())
         .collect()
 }
 
-fn random_hex() -> String {
-    const DIGITS: &[u8] = b"0123456789abcdef";
-    let step = Uniform::new(0, DIGITS.len());
-    let mut rng = rand::thread_rng();
-    step.sample_iter(&mut rng)
-        .take(6)
-        .map(|x| DIGITS[x] as char)
+/// 生成指定位数的十六进制随机数
+fn random_hex(len: usize) -> String {
+    let mut rng = rand::rng();
+    (0..len)
+        .map(|_| format!("{:x}", rng.random_range(0..16)))
         .collect()
+}
+
+/// 安全获取路径文件名
+fn file_name(path: &PathBuf) -> String {
+    path.file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or_default()
+        .to_string()
+}
+
+/// 获取无扩展名的文件名
+fn file_name_base(path: &PathBuf) -> String {
+    let name = file_name(path);
+    name.chars()
+        .take_while(|&c| char_is_word(c) && c != '.')
+        .collect()
+}
+
+fn file_directory(path: &PathBuf) -> String {
+    path.parent()
+        .and_then(|p| p.to_str())
+        .unwrap_or("")
+        .to_owned()
+}
+
+/// 路径转字符串
+fn path_to_str(path: &PathBuf) -> String {
+    path.to_str().unwrap_or_default().to_string()
 }
 
 #[cfg(test)]
 mod test {
+    use copypasta::{ClipboardContext, ClipboardProvider};
 
-    use super::{VariableInit, Variables};
+    use super::init_variable_automaton;
 
     #[test]
-    fn test_convert() {
-        let text = String::from("${CURRENT_YEAR_SHORT} or $CURRENT_YEAR_SHORT");
-
-        let v = Variables::CurrentYearShort;
-        let re = v.convert(&text);
-
-        assert_eq!(re.len(), 8);
+    fn test_var() {
+        init_variable_automaton();
     }
 
     #[test]
-    fn test_convert_all() {
-        let text = String::from("${CURRENT_YEAR} or $CURRENT_YEAR_SHORT");
-
-        let mut vars = VariableInit::default();
-        let root = std::env::current_dir().ok().unwrap();
-        vars.file_path.clone_from(&root);
-        vars.work_path.clone_from(&root);
-
-        let re = Variables::convert_all(&text, &vars);
-
-        assert_eq!(re.len(), 10);
+    fn test_clipboard() {
+        let mut ctx = ClipboardContext::new().unwrap();
+        let msg = "Hello!";
+        ctx.set_contents(msg.to_owned()).unwrap();
+        let content = ctx.get_contents().unwrap();
+        assert_eq!(msg, content, "{msg},{content}");
     }
 }

@@ -51,7 +51,7 @@ impl Snippet {
     /// 转换为 lsp 类型 CompletionItem
     fn to_completion_item(&self, variable_init: &VariableInit) -> Vec<CompletionItem> {
         let body = self.body.to_string();
-        let body = Variables::convert_all(&body, variable_init);
+        let body = Variables::replace_all(&body, variable_init);
 
         match &self.prefix {
             StrOrSeq::String(s) => {

@@ -1,4 +1,4 @@
-use hx_lsp::{lsp::Server, variables::get_time_offset};
+use hx_lsp::{lsp::Server, variables};
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
@@ -8,6 +8,6 @@ async fn main() {
             eprintln!("version: {version}");
         }
     }
-    let _ = get_time_offset();
+    variables::init();
     Server::run().await;
 }

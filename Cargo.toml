@@ -25,7 +25,7 @@ json_comments = "0.2.2"
 miette = "7.2.0"
 nucleo = "0.5.0"
 parking_lot = "0.12.1"
-rand = "0.8.5"
+rand = "0.9"
 regex = "1.10.4"
 ropey = "1.6.1"
 serde = { version = "1.0.197", features = ["derive"] }
