@@ -7,8 +7,8 @@ An LSP tool that provides custom code snippets and Code Actions for [Helix Edito
 ## Features
 
 - Completion: snippets
-- CodeAction: actions
-- Document Color
+- CodeAction: actions (helix#9801)
+- Document Color (helix#12308)
 
 ## Install
 
@@ -73,7 +73,7 @@ In LSP `textDocument/didOpen` request, The Configuration file with name that is 
 
 Code Snippets support [vscode snippets](https://code.visualstudio.com/docs/editor/userdefinedsnippets) format. The same file suffix supports global suffixes such as`. code-snippets` and language pack suffixes such as`. json`.
 
-For better use snippet completion, Use helix master and merge [helix#9081 Add a snippet system](https://github.com/helix-editor/helix/pull/9801) to support smart-tab。
+~~For better use snippet completion, Use helix master and merge [helix#9081 Add a snippet system](https://github.com/helix-editor/helix/pull/9801) to support smart-tab。 ~~
 
 ```svgbob
 .
@@ -91,34 +91,36 @@ Snippet Format：
 - **description**: `Option<String>`, Tip
 
 ```jsonc
+
 {
-  "markdown a": {
-    // name
-    "prefix": "mda", // string
-    "body": "mda in .helix: ${1:abc} : ${2:cde}", // string
-    "description": "test a info content in .helix",
-  },
-  "markdown b": {
-    "prefix": [
-      // array
-      "mdb",
-    ],
-    "body": "mdb: ${1:abc} : ${2:cde}", // string
-    "description": "test b info content",
-  },
-  "markdown c": {
-    "prefix": [
-      // array
-      "mdc",
-      "mdd",
-    ],
+  "mdbookNote": {
+    "prefix": "mdbookNote",
     "body": [
-      // array
-      "mda: ${1:abc} : ${2:cde}",
-      "test",
+      "```admonish note ${1:title=\"$2\"}",
+      "${3:content}",
+      "```"
     ],
-    "description": "test c,d info content",
+    "description": "mdbook admonish note"
   },
+
+  "mdbookBob": {
+    "prefix": "mdbookBob",
+    "body": "```svgbob \n$1\n```",
+    "description": "mdbook svgbob "
+  },
+  "dir": {
+    "prefix": "dir",
+    "body": [
+      "TM_FILENAME: $TM_FILENAME",
+      "TM_FILENAME_BASE: $TM_FILENAME_BASE",
+      "TM_DIRECTORY: $TM_DIRECTORY",
+      "TM_FILEPATH: ${TM_FILEPATH}",
+      "RELATIVE_FILEPATH: $RELATIVE_FILEPATH",
+      "WORKSPACE_NAME: $WORKSPACE_NAME ",
+      "WORKSPACE_FOLDER: $WORKSPACE_FOLDER "
+    ],
+    "description": "path of current"
+  }
 }
 ```
 
@@ -159,23 +161,23 @@ Snippet Formatter：
 ```jsonc
 /* actions/go.json */
 {
-  "run main": {
-    "title": "go run main",
-    "filter": "func main",
-    "shell": [
-      "alacritty --hold --working-directory ${TM_DIRECTORY} -e go run ${TM_FILENAME}"
-    ],
-    "description": "go run main"
-  },
-  "run main in tmux": {
-    "title": "tmux: go run main",
-    "catch": "func main",
-    "shell": [
-      "tmux split-window -h -c ${WORKSPACE_FOLDER};",
-      "tmux send 'go build' Enter"
-    ],
-    "description": "go run main"
-  }
+	"run main": {
+		"title": "run main",
+		"filter": "[[ \"$TM_CURRENT_LINE\" == *main* ]] && echo true || echo false",
+		"shell": [
+			"alacritty --hold --working-directory ${TM_DIRECTORY} -e go run ${TM_FILENAME};"
+			"notify-send \"Golang\" \"RUN: ${TM_FILENAME}\""
+		],
+		"description": "go run main"
+	},
+	"run main in tmux": {
+		"title": "tmux: go run main",
+		"filter": "[[ \"$(cat)\" == *main* ]] && echo true || echo false",
+		"shell": [
+			"tmux split-window -h -c ${WORKSPACE_FOLDER}; tmux send 'go run ${TM_FILENAME}' Enter"
+		],
+		"description": "go run main"
+	}
 }
 ```
 
@@ -184,6 +186,8 @@ Snippet Formatter：
 ## Variables
 
 Support variable for snippet body and action shell.
+
+> [vscode Variables](https://code.visualstudio.com/docs/editor/userdefinedsnippets#_variables)
 
 Support like `$UUID` 和 `${UUID}`。
 
@@ -225,6 +229,22 @@ Support like `$UUID` 和 `${UUID}`。
 - [x] `RANDOM_HEX`
 - [x] `UUID`
 
-**action catch**
+## DocumentColor 
 
-- [ ] `CATCH1..9`
+	- rgb(255, 255, 255) supports integers
+	- rgb(2.0, 255.0, 255.0) supports floating-point values
+  - rgb(100%, 0%, 50%) supports percentages
+- hsl
+	- hsl(240, 50%, 50%) hue 0-360 degrees, saturation and lightness in percentages.
+  - hsl(180, 0.5, 0.5) floating-point values
+- hsv
+	- hsv(300, 100%, 100%) hue 0-360 degrees, saturation and value in percentages.
+  - hsv(180, 0.5, 0.5) floating-point values
+
+## bevy color
+
+- rgba(1.0, 0.0, 0.0, 0.5)
+- srgb(1.0,0.0,0.0)
+- srgba(1.0, 0.0, 0.0, 0.8)
+- hsla(300, 100%, 100%, 0.5) 
+- hsva(180, 0.5, 0.5, 0.5) 

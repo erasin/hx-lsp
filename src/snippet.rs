@@ -10,7 +10,6 @@ use serde::{Deserialize, Serialize};
 use std::sync::OnceLock;
 
 use crate::{
-    // Result,
     fuzzy::fuzzy_match,
     loader::{Dirs, config_dir},
     parser::{Parser, StrOrSeq, parse},

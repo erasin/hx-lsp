@@ -2,12 +2,11 @@
 
 [![English](https://img.shields.io/badge/lang-english-blue.svg)](./README.md)
 
-
 一个提供了自定义代码片段 snippets 和 Code Action 的 lsp 工具。
 
 ## 功能
 
-- Completion: snippets()
+- Completion: snippets
 - CodeAction: actions (helix#9801)
 - Document Color (helix#12308)
 
@@ -191,7 +190,6 @@ hx-lsp 的代码片段兼容 [vscode snippets](https://code.visualstudio.com/doc
 
 > [vscode Variables](https://code.visualstudio.com/docs/editor/userdefinedsnippets#_variables)
 
-
 为 `snippet.body`, `action.filter`, `action.shell` 提供变量字段。
 
 > 支持 `$UUID` 和 `${UUID}` 变量写法。
@@ -247,7 +245,7 @@ hx-lsp 的代码片段兼容 [vscode snippets](https://code.visualstudio.com/doc
   - hsl(180, 0.5, 0.5) 浮点值
 - hsv
 	- hsv(300, 100%, 100%) 色相 0-360 度, 饱和度和明度百分比。
-  - hsv(180, 0.5, 0.5, 1) 浮点值
+  - hsv(180, 0.5, 0.5) 浮点值
 
 ## bevy color
 
