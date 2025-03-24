@@ -231,20 +231,21 @@ Support like `$UUID` 和 `${UUID}`。
 
 ## DocumentColor 
 
+- rgb
 	- rgb(255, 255, 255) supports integers
 	- rgb(2.0, 255.0, 255.0) supports floating-point values
   - rgb(100%, 0%, 50%) supports percentages
+	- rgba(1.0, 0.0, 0.0, 0.5)
 - hsl
 	- hsl(240, 50%, 50%) hue 0-360 degrees, saturation and lightness in percentages.
   - hsl(180, 0.5, 0.5) floating-point values
+	- hsla(300, 100%, 100%, 0.5) 
 - hsv
 	- hsv(300, 100%, 100%) hue 0-360 degrees, saturation and value in percentages.
   - hsv(180, 0.5, 0.5) floating-point values
+	- hsva(180, 0.5, 0.5, 0.5) 
 
 ## bevy color
 
-- rgba(1.0, 0.0, 0.0, 0.5)
 - srgb(1.0,0.0,0.0)
 - srgba(1.0, 0.0, 0.0, 0.8)
-- hsla(300, 100%, 100%, 0.5) 
-- hsva(180, 0.5, 0.5, 0.5) 

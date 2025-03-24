@@ -221,7 +221,7 @@ fn parse_srgb(text: &str) -> Option<Color> {
 
 // bevy color RGBA 解析
 fn parse_rgba(text: &str) -> Option<Color> {
-    parse_rgb_like(text, "rgba(", 4, &[1.0, 1.0, 1.0, 1.0])
+    parse_rgb_like(text, "rgba(", 4, &[255.0, 255.0, 255.0, 1.0])
 }
 
 // 解析 RGB 颜色（支持小数和范围校验）
