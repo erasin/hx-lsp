@@ -236,6 +236,8 @@ hx-lsp 的代码片段兼容 [vscode snippets](https://code.visualstudio.com/doc
 
 ## DocumentColor 色彩支持 
 
+- hex
+	- #ffffff
 - rgb
 	- rgb(255, 255, 255) 支持整数
 	- rgb(2.0, 255.0, 255.0) 支持浮点值

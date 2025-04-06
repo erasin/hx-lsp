@@ -44,6 +44,9 @@ command = "hx-lsp"
 [[language]]
 name = "markdown"
 language-servers = [ "marksman", "markdown-oxide", "hx-lsp" ]
+
+# or only use choose features
+language-servers = [ "marksman", "markdown-oxide", { name = "hx-lsp", only-features = [ "document-colors" ] } ]
 ```
 
 > About `language id`, Read [helix/languages.toml](https://github.com/helix-editor/helix/blob/master/languages.toml) and [helix wiki language server configurations](https://github.com/helix-editor/helix/wiki/Language-Server-Configurations)。
@@ -231,6 +234,8 @@ Support like `$UUID` 和 `${UUID}`。
 
 ## DocumentColor 
 
+- hex
+	- #ffffff; support hex color
 - rgb
 	- rgb(255, 255, 255) supports integers
 	- rgb(2.0, 255.0, 255.0) supports floating-point values
