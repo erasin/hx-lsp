@@ -6,8 +6,8 @@
 
 ## 功能
 
-- Completion: snippets
-- CodeAction: actions (helix#9801)
+- Completion: snippets  (helix#9801)
+- CodeAction: actions
 - Document Color (helix#12308)
 
 ## 安装
@@ -46,9 +46,19 @@ command = "hx-lsp"
 [[language]]
 name = "markdown"
 language-servers = [ "marksman", "markdown-oxide", "hx-lsp" ]
+
+# 或者仅支持部分功能 
+language-servers = [ "marksman", "markdown-oxide", { name = "hx-lsp", only-features = [ "document-colors" ] } ]
 ```
 
+
 > 关于 `language id` 建议参考 [helix/languages.toml](https://github.com/helix-editor/helix/blob/master/languages.toml) 文件和 [helix wiki language server configurations](https://github.com/helix-editor/helix/wiki/Language-Server-Configurations)。
+>
+> helix 支持 lsp 使用 `only-features` 和 `except-features ` 来过滤功能。
+> hx-lsp 支持
+>   - completion
+>   - code-action
+>   - document-colors
 
 
 ## 配置文件
@@ -92,7 +102,7 @@ hx-lsp 的代码片段兼容 [vscode snippets](https://code.visualstudio.com/doc
 - **name**: `String`: 唯一内容，用于索引。
 - **prefix**: `String` 或 `Vec<String>`: 提供给 helix 编辑器的补全列表使用。
 - **body**: `String` 或 `Vec<String>` : 代码片段。
-- **description**: `Option<String>`: 提示内容。
+- **description**: `Option<String|Vec<String>>`: 提示内容
 
 ```jsonc
 {
@@ -141,7 +151,7 @@ hx-lsp 的代码片段兼容 [vscode snippets](https://code.visualstudio.com/doc
 - **title**: `String`: 显示条目内容
 - **filter**: `String` 或 `Vec<String>`: Shell 脚本, 参数是选择区域内容以及替换字段`Variables`，当为空或者返回 `true`，`1`的时候则使用该交互Action。
 - **shell**: `String` 或 `Vec<String>`: Shell 脚本，参数是选择区域内容以及替换字段`Variables`，返回字符串则替换选择区域的内容。
-- **description**: `Option<String>`: 提示内容
+- **description**: `Option<String|Vec<String>>`: 提示内容
 
 > 选择区域的内容使用 `Stdio::piped` 传输，在脚本中使用`$(cat)` 捕捉，或者使用替换字段 `$TM_SELECTED_TEXT`。
 
@@ -188,7 +198,7 @@ hx-lsp 的代码片段兼容 [vscode snippets](https://code.visualstudio.com/doc
 
 ## Variables 字段
 
-> [vscode Variables](https://code.visualstudio.com/docs/editor/userdefinedsnippets#_variables)
+> 阅读 [vscode Variables](https://code.visualstudio.com/docs/editor/userdefinedsnippets#_variables)
 
 为 `snippet.body`, `action.filter`, `action.shell` 提供变量字段。
 
@@ -196,43 +206,43 @@ hx-lsp 的代码片段兼容 [vscode snippets](https://code.visualstudio.com/doc
 
 **path**
 
-- [x] `TM_SELECTED_TEXT` 选择区域的内容
-- [x] `TM_CURRENT_LINE` 光标所在行内容
-- [x] `TM_CURRENT_WORD` 光标所在单词内容
-- [x] `TM_LINE_INDEX` 光标所在行基于0索引
-- [x] `TM_LINE_NUMBER` 光标所在行数字
-- [x] `TM_FILENAME` 文件名称
-- [x] `TM_FILENAME_BASE` 文件名称，无扩展名称
-- [x] `TM_DIRECTORY` 当前文档目录
-- [x] `TM_FILEPATH` 当前文档的完整路径
-- [x] `RELATIVE_FILEPATH` 文档的相对路径
-- [x] `CLIPBOARD` 粘贴板内容
-- [x] `WORKSPACE_NAME` 工作区或文件夹名称
-- [x] `WORKSPACE_FOLDER` 工作区或文件夹路径
-- [x] `CURSOR_INDEX` 基于0索引的游标号
-- [x] `CURSOR_NUMBER` 基于一个索引的游标号
+- `TM_SELECTED_TEXT` 选择区域的内容
+- `TM_CURRENT_LINE` 光标所在行内容
+- `TM_CURRENT_WORD` 光标所在单词内容
+- `TM_LINE_INDEX` 光标所在行基于0索引
+- `TM_LINE_NUMBER` 光标所在行数字
+- `TM_FILENAME` 文件名称
+- `TM_FILENAME_BASE` 文件名称，无扩展名称
+- `TM_DIRECTORY` 当前文档目录
+- `TM_FILEPATH` 当前文档的完整路径
+- `RELATIVE_FILEPATH` 文档的相对路径
+- `CLIPBOARD` 粘贴板内容
+- `WORKSPACE_NAME` 工作区或文件夹名称
+- `WORKSPACE_FOLDER` 工作区或文件夹路径
+- `CURSOR_INDEX` 基于0索引的游标号
+- `CURSOR_NUMBER` 基于一个索引的游标号
 
 **时间日期**
 
-- [x] `CURRENT_YEAR` 当前年份
-- [x] `CURRENT_YEAR_SHORT`当前年份后两位
-- [x] `CURRENT_MONTH` 当权月份，例如 `02`
-- [x] `CURRENT_MONTH_NAME` 月份名称 例如 `July`
-- [x] `CURRENT_MONTH_NAME_SHORT` 月份名称 例如 `Jul`
-- [x] `CURRENT_DATE` 月份中的日期 `01`
-- [x] `CURRENT_DAY_NAME` 星期名称 `Monday`
-- [x] `CURRENT_DAY_NAME_SHORT` 日期名称 `Mon`
-- [x] `CURRENT_HOUR` 24小时 `01`
-- [x] `CURRENT_MINUTE` 分钟 `01`
-- [x] `CURRENT_SECOND` 秒 `01`
-- [x] `CURRENT_SECONDS_UNIX` Unix开始的秒数
-- [x] `CURRENT_TIMEZONE_OFFSET` UTC时区偏移
+- `CURRENT_YEAR` 当前年份
+- `CURRENT_YEAR_SHORT`当前年份后两位
+- `CURRENT_MONTH` 当权月份，例如 `02`
+- `CURRENT_MONTH_NAME` 月份名称 例如 `July`
+- `CURRENT_MONTH_NAME_SHORT` 月份名称 例如 `Jul`
+- `CURRENT_DATE` 月份中的日期 `01`
+- `CURRENT_DAY_NAME` 星期名称 `Monday`
+- `CURRENT_DAY_NAME_SHORT` 日期名称 `Mon`
+- `CURRENT_HOUR` 24小时 `01`
+- `CURRENT_MINUTE` 分钟 `01`
+- `CURRENT_SECOND` 秒 `01`
+- `CURRENT_SECONDS_UNIX` Unix开始的秒数
+- `CURRENT_TIMEZONE_OFFSET` UTC时区偏移
 
 **随机插入值**
 
-- [x] `RANDOM` 
-- [x] `RANDOM_HEX`
-- [x] `UUID`
+- `RANDOM` 
+- `RANDOM_HEX`
+- `UUID`
 
 ## DocumentColor 色彩支持 
 

@@ -6,8 +6,8 @@ An LSP tool that provides custom code snippets and Code Actions for [Helix Edito
 
 ## Features
 
-- Completion: snippets
-- CodeAction: actions (helix#9801)
+- Completion: snippets (helix#9801)
+- CodeAction: actions 
 - Document Color (helix#12308)
 
 ## Install
@@ -51,6 +51,13 @@ language-servers = [ "marksman", "markdown-oxide", { name = "hx-lsp", only-featu
 
 > About `language id`, Read [helix/languages.toml](https://github.com/helix-editor/helix/blob/master/languages.toml) and [helix wiki language server configurations](https://github.com/helix-editor/helix/wiki/Language-Server-Configurations)。
 
+> helix lsp 使用 `only-features` 和 `except-features ` 来过滤功能。
+> hx-lsp 支持
+>   - completion
+>   - code-action
+>   - document-colors
+
+
 ## Configuration
 
 The Configuration file supports the `jsonc` format.
@@ -91,7 +98,7 @@ Snippet Format：
 - **name**: `String`, index
 - **prefix**: `String` Or `Vec<String>`, editor completion item
 - **body**: `String` Or `Vec<String>`, snippet connent
-- **description**: `Option<String>`, Tip
+- **description**: `Option<String | Vec<String>>` Tip content
 
 ```jsonc
 
@@ -141,7 +148,7 @@ Snippet Formatter：
 - **title**: `String` helix editor show Code Action Item
 - **flter**: `String` Or `Vec<String>` Shell script: return `true`,`1` or empty , 
 - **shell**: `String` Or `Vec<String>` Shell script: take shell script
-- **description**: `Option<String>` Tip content
+- **description**: `Option<String | Vec<String>>` Tip content
 
 ```jsonc
 /* actions/markdown.json */
@@ -190,47 +197,47 @@ Snippet Formatter：
 
 Support variable for snippet body and action shell.
 
-> [vscode Variables](https://code.visualstudio.com/docs/editor/userdefinedsnippets#_variables)
+> Read [vscode Variables](https://code.visualstudio.com/docs/editor/userdefinedsnippets#_variables)
 
 Support like `$UUID` 和 `${UUID}`。
 
 **path**
 
-- [x] `TM_SELECTED_TEXT`
-- [x] `TM_CURRENT_LINE`
-- [x] `TM_CURRENT_WORD`
-- [x] `TM_LINE_INDEX`
-- [x] `TM_LINE_NUMBER`
-- [x] `TM_FILENAME`
-- [x] `TM_FILENAME_BASE`
-- [x] `TM_DIRECTORY`
-- [x] `TM_FILEPATH`
-- [x] `RELATIVE_FILEPATH`
-- [x] `CLIPBOARD`
-- [x] `WORKSPACE_NAME`
-- [x] `WORKSPACE_FOLDER`
+- `TM_SELECTED_TEXT`
+- `TM_CURRENT_LINE`
+- `TM_CURRENT_WORD`
+- `TM_LINE_INDEX`
+- `TM_LINE_NUMBER`
+- `TM_FILENAME`
+- `TM_FILENAME_BASE`
+- `TM_DIRECTORY`
+- `TM_FILEPATH`
+- `RELATIVE_FILEPATH`
+- `CLIPBOARD`
+- `WORKSPACE_NAME`
+- `WORKSPACE_FOLDER`
 
 **time**
 
-- [x] `CURRENT_YEAR`
-- [x] `CURRENT_YEAR_SHORT`
-- [x] `CURRENT_MONTH`
-- [x] `CURRENT_MONTH_NAME`
-- [x] `CURRENT_MONTH_NAME_SHORT`
-- [x] `CURRENT_DATE`
-- [x] `CURRENT_DAY_NAME`
-- [x] `CURRENT_DAY_NAME_SHORT`
-- [x] `CURRENT_HOUR`
-- [x] `CURRENT_MINUTE`
-- [x] `CURRENT_SECOND`
-- [x] `CURRENT_SECONDS_UNIX`
-- [x] `CURRENT_TIMEZONE_OFFSET`
+- `CURRENT_YEAR`
+- `CURRENT_YEAR_SHORT`
+- `CURRENT_MONTH`
+- `CURRENT_MONTH_NAME`
+- `CURRENT_MONTH_NAME_SHORT`
+- `CURRENT_DATE`
+- `CURRENT_DAY_NAME`
+- `CURRENT_DAY_NAME_SHORT`
+- `CURRENT_HOUR`
+- `CURRENT_MINUTE`
+- `CURRENT_SECOND`
+- `CURRENT_SECONDS_UNIX`
+- `CURRENT_TIMEZONE_OFFSET`
 
 **other**
 
-- [x] `RANDOM`
-- [x] `RANDOM_HEX`
-- [x] `UUID`
+- `RANDOM`
+- `RANDOM_HEX`
+- `UUID`
 
 ## DocumentColor 
 
