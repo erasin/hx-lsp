@@ -70,8 +70,6 @@ pub fn extract_colors(doc: &Rope) -> Vec<ColorInformation> {
         }
 
         // 使用模式匹配检测其他格式
-
-        // 使用模式匹配检测其他格式
         let matched = COLOR_FORMATS.iter().find_map(|format| {
             let prefix_len = format.prefix.len();
             if pos + prefix_len > text_len {

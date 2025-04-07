@@ -36,7 +36,7 @@ use crate::{
 pub struct Snippet {
     prefix: StrOrSeq, // string
     body: StrOrSeq,   // string
-    description: Option<String>,
+    description: Option<StrOrSeq>,
 }
 
 fn to_completion_item(prefix: String, body: String, detail: String) -> CompletionItem {
@@ -66,7 +66,7 @@ impl Snippet {
     /// 获取 description, 兼容空对象
     fn description(&self) -> String {
         match &self.description {
-            Some(s) => s.clone(),
+            Some(s) => s.to_string(),
             None => String::new(),
         }
     }

@@ -30,7 +30,7 @@ pub struct Action {
     /// shell 执行 返回 string
     shell: StrOrSeq, // string
     /// 简介
-    description: Option<String>,
+    description: Option<StrOrSeq>,
 }
 
 impl Action {
@@ -60,7 +60,7 @@ impl Action {
     #[allow(dead_code)]
     fn description(&self) -> String {
         match &self.description {
-            Some(s) => s.clone(),
+            Some(s) => s.to_string(),
             None => String::new(),
         }
     }
