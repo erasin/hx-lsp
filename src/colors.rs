@@ -386,10 +386,9 @@ mod tests {
         );
     }
 
-    fn test_parse_func(
-        func: fn(&str) -> Option<Color>,
-        cases: &[(&str, Option<(f32, f32, f32, f32)>)],
-    ) {
+    type ColorCheck = (f32, f32, f32, f32);
+
+    fn test_parse_func(func: fn(&str) -> Option<Color>, cases: &[(&str, Option<ColorCheck>)]) {
         for (input, expected) in cases {
             let result = func(&input.to_lowercase());
             println!("--> {input} {result:?} {expected:?}");
@@ -436,7 +435,7 @@ mod tests {
         let cases = [
             ("rgb(255, 0, 0)", Some((1.0, 0.0, 0.0, 1.0))),
             ("rgb(100%, 50%, 0%)", Some((1.0, 0.5, 0.0, 1.0))),
-            ("rgba(1.0, 0.5, 0.25, 0.5)", Some((1.0, 0.5, 0.25, 0.5))),
+            ("rgba(255, 99, 71, 0.8)", Some((1.0, 0.388, 0.278, 0.8))),
             ("rgba(300, 0, 0, 1)", None), // 超范围
         ];
         test_parse_func(parse_rgb, &cases[0..2]);
@@ -517,7 +516,7 @@ mod tests {
 
         for input in cases {
             assert!(
-                parse_color(&input).is_none(),
+                parse_color(input).is_none(),
                 "Should reject invalid input: {}",
                 input
             );

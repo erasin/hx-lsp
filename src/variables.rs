@@ -1,7 +1,13 @@
+use std::fmt::Write;
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+    sync::OnceLock,
+};
+
 use aho_corasick::{AhoCorasick, PatternID};
 use parking_lot::Mutex;
 use rand::Rng;
-use std::{collections::HashMap, path::PathBuf, sync::OnceLock};
 use time::{
     OffsetDateTime, UtcOffset,
     format_description::{self, BorrowedFormatItem, OwnedFormatItem},
@@ -306,7 +312,7 @@ fn init_time_formats() -> &'static Mutex<HashMap<&'static str, Vec<OwnedFormatIt
 }
 
 /// 将 BorrowedFormatItem 转换为 OwnedFormatItem
-fn convert_to_owned<'a>(items: Vec<BorrowedFormatItem<'a>>) -> Vec<OwnedFormatItem> {
+fn convert_to_owned(items: Vec<BorrowedFormatItem>) -> Vec<OwnedFormatItem> {
     items.iter().map(|item| item.into()).collect()
 }
 
@@ -362,13 +368,14 @@ fn random_base10(len: usize) -> String {
 /// 生成指定位数的十六进制随机数
 fn random_hex(len: usize) -> String {
     let mut rng = rand::rng();
-    (0..len)
-        .map(|_| format!("{:x}", rng.random_range(0..16)))
-        .collect()
+    (0..len).fold(String::new(), |mut output, _buf| {
+        write!(output, "{:x}", rng.random_range(0..16)).unwrap();
+        output
+    })
 }
 
 /// 安全获取路径文件名
-fn file_name(path: &PathBuf) -> String {
+fn file_name(path: &Path) -> String {
     path.file_name()
         .and_then(|n| n.to_str())
         .unwrap_or_default()
@@ -376,14 +383,14 @@ fn file_name(path: &PathBuf) -> String {
 }
 
 /// 获取无扩展名的文件名
-fn file_name_base(path: &PathBuf) -> String {
+fn file_name_base(path: &Path) -> String {
     let name = file_name(path);
     name.chars()
         .take_while(|&c| char_is_word(c) && c != '.')
         .collect()
 }
 
-fn file_directory(path: &PathBuf) -> String {
+fn file_directory(path: &Path) -> String {
     path.parent()
         .and_then(|p| p.to_str())
         .unwrap_or("")
@@ -391,7 +398,7 @@ fn file_directory(path: &PathBuf) -> String {
 }
 
 /// 路径转字符串
-fn path_to_str(path: &PathBuf) -> String {
+fn path_to_str(path: &Path) -> String {
     path.to_str().unwrap_or_default().to_string()
 }
 

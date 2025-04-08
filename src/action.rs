@@ -308,7 +308,7 @@ mod test {
     fn test_basic_command() -> Result<()> {
         // 测试基础命令执行
         #[cfg(unix)]
-        let (cmd, input, expected) = ("echo -n hello", &Some(String::from("text")), "hello");
+        let (cmd, input, expected) = ("echo hello", &Some(String::from("text")), "hello");
         #[cfg(windows)]
         let (cmd, input, expected) = ("echo hello", &Some(Rope::from_str("text")), "hello");
 

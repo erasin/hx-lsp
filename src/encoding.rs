@@ -194,7 +194,7 @@ mod test {
                     Position::new(range.2, range.3),
                 ),
             )
-            .and_then(|f| Some(f.to_string()))
+            .map(|f| f.to_string())
             .unwrap_or_default();
             assert_eq!(result, expected, "{input}:\n {result} != {expected}")
         }
