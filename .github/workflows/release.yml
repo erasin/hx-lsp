@@ -13,23 +13,34 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
+        build: [x86_64-linux, aarch64-linux, x86_64-macos, x86_64-windows]
         include:
-          # Linux
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-musl
-            bin_name: hx-lsp-x86_64-linux
-          # Windows
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            bin_name: hx-lsp-x86_64-windows.exe
-          # macOS Intel
-          - os: macos-latest
-            target: x86_64-apple-darwin
-            bin_name: hx-lsp-x86_64-macos
-          # macOS ARM
-          - os: macos-latest
-            target: aarch64-apple-darwin
-            bin_name: hx-lsp-aarch64-macos
+        - build: x86_64-linux
+          os: ubuntu-24.04
+          rust: stable
+          target: x86_64-unknown-linux-gnu
+          cross: false
+        - build: aarch64-linux
+          os: ubuntu-24.04-arm
+          rust: stable
+          target: aarch64-unknown-linux-gnu
+          cross: false
+        - build: x86_64-macos
+          os: macos-latest
+          rust: stable
+          target: x86_64-apple-darwin
+          cross: false
+        - build: x86_64-windows
+          os: windows-latest
+          rust: stable
+          target: x86_64-pc-windows-msvc
+          cross: false
+        - build: aarch64-macos
+          os: macos-latest
+          rust: stable
+          target: aarch64-apple-darwin
+          cross: false
+          skip_tests: true
 
     steps:
       - name: Checkout sources
@@ -53,9 +64,9 @@ jobs:
           cp target/${{ matrix.target }}/release/hx-lsp${{ matrix.target == 'x86_64-pc-windows-msvc' && '.exe' || '' }} release/${{ matrix.bin_name }}
 
       # 上传为制品
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4 
         with:
-          name: binaries
+          name: bins-${{ matrix.build }}
           path: release/${{ matrix.bin_name }}
 
   create-release:
