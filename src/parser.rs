@@ -28,7 +28,7 @@ where
     let hs = match serde_json::from_reader(json_data) {
         Ok(s) => s,
         Err(err) => {
-            error!("Parse Fail: {err:?}");
+            error!("{name} Parse Fail: {err:?}");
             return Err(err.into());
         }
     };

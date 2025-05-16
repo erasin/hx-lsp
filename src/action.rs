@@ -295,7 +295,7 @@ fn get_shell() -> Vec<String> {
 }
 
 #[cfg(windows)]
-fn get_shell() -> &Vec<String> {
+fn get_shell() -> Vec<String> {
     vec!["cmd".to_owned(), "/C".to_owned()]
 }
 
@@ -310,7 +310,7 @@ mod test {
         #[cfg(unix)]
         let (cmd, input, expected) = ("echo hello", &Some(String::from("text")), "hello");
         #[cfg(windows)]
-        let (cmd, input, expected) = ("echo hello", &Some(Rope::from_str("text")), "hello");
+        let (cmd, input, expected) = ("echo hello", &Some(String::from("text")), "hello");
 
         let output = shell(cmd, input)?;
         assert_eq!(output.trim_end(), expected.trim_end());

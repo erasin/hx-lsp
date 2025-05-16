@@ -33,7 +33,6 @@ serde_json = "1.0.115"
 thiserror = "1.0.58"
 time = { version = "0.3.36", features = ["formatting", "local-offset"] }
 tokio = { version = "1.42.0", features = ["full"] }
-tokio-utils = "0.1.2"
 tower = "0.5.2"
 tracing = "0.1.41"
 tracing-subscriber = "0.3.19"
@@ -43,11 +42,7 @@ uuid = { version = "1.8.0", features = ["v4"] }
 which = "6.0"
 
 [target.'cfg(windows)'.dependencies]
-clipboard-win = { version = "5.3", features = ["std"] }
-
-[target.'cfg(unix)'.dependencies]
-libc = "0.2"
-rustix = { version = "0.38", features = ["fs"] }
+tokio-util = { version = "0.7.15", features = ["compat"]}
 
 [profile.release]
 opt-level = "z"
