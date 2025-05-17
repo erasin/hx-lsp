@@ -13,61 +13,98 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        build: [x86_64-linux, aarch64-linux, x86_64-macos, x86_64-windows]
+        build: [x86_64-linux, aarch64-linux, x86_64-macos, aarch64-macos, x86_64-windows]
         include:
-        - build: x86_64-linux
-          os: ubuntu-24.04
-          rust: stable
-          target: x86_64-unknown-linux-gnu
-          cross: false
-        - build: aarch64-linux
-          os: ubuntu-24.04-arm
-          rust: stable
-          target: aarch64-unknown-linux-gnu
-          cross: false
-        - build: x86_64-macos
-          os: macos-latest
-          rust: stable
-          target: x86_64-apple-darwin
-          cross: false
-        - build: x86_64-windows
-          os: windows-latest
-          rust: stable
-          target: x86_64-pc-windows-msvc
-          cross: false
-        - build: aarch64-macos
-          os: macos-latest
-          rust: stable
-          target: aarch64-apple-darwin
-          cross: false
-          skip_tests: true
+          - build: x86_64-linux
+            os: ubuntu-24.04
+            rust: stable
+            target: x86_64-unknown-linux-gnu
+            cross: false
+            bin_name: hx-lsp
+            archive_name: hx-lsp-x86_64-linux.tar.gz
+          - build: aarch64-linux
+            os: ubuntu-24.04-arm
+            rust: stable
+            target: aarch64-unknown-linux-gnu
+            cross: false
+            bin_name: hx-lsp
+            archive_name: hx-lsp-aarch64-linux.tar.gz
+          - build: x86_64-macos
+            os: macos-latest
+            rust: stable
+            target: x86_64-apple-darwin
+            cross: false
+            bin_name: hx-lsp
+            archive_name: hx-lsp-x86_64-macos.tar.gz
+          - build: aarch64-macos
+            os: macos-latest
+            rust: stable
+            target: aarch64-apple-darwin
+            cross: false
+            skip_tests: true
+            bin_name: hx-lsp
+            archive_name: hx-lsp-aarch64-macos.tar.gz
+          - build: x86_64-windows
+            os: windows-latest
+            rust: stable
+            target: x86_64-pc-windows-msvc
+            cross: false
+            bin_name: hx-lsp.exe
+            archive_name: hx-lsp-x86_64-windows.zip
 
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
 
-      # 安装 Rust 工具链 + 目标平台支持
       - name: Install ${{ matrix.rust }} toolchain
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ matrix.rust }}
           target: ${{ matrix.target }}
 
-      # 构建发布版
       - name: Cargo build
         run: cargo build --release --locked --target ${{ matrix.target }}
 
-      # 重命名二进制文件
-      - name: Rename binary
+      - name: Prepare release files
+        shell: bash
         run: |
           mkdir -p release
-          cp target/${{ matrix.target }}/release/hx-lsp${{ matrix.target == 'x86_64-pc-windows-msvc' && '.exe' || '' }} release/${{ matrix.bin_name }}
+          cp target/${{ matrix.target }}/release/${{ matrix.bin_name }} release/
+          cp README* release/ 2>/dev/null || true
+          cp LICENSE* release/ 2>/dev/null || true
 
-      # 上传为制品
-      - uses: actions/upload-artifact@v4 
+      # ✅ Windows: use PowerShell Compress-Archive
+      - name: Package binary on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $archive = "${{ matrix.archive_name }}"
+          $binary = "release\${{ matrix.bin_name }}"
+          $files = @($binary)
+          if (Test-Path -Path "release\README.md")   { $files += "release\README.md" }
+          if (Test-Path -Path "release\LICENSE")     { $files += "release\LICENSE" }
+          if (Test-Path -Path "release\LICENSE.txt") { $files += "release\LICENSE.txt" }
+          Compress-Archive -Path $files -DestinationPath "release\$archive"
+
+      # ✅ Unix/macOS: use bash + zip/tar
+      - name: Package binary on Unix
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          cd release
+          if [[ "${{ matrix.archive_name }}" == *.zip ]]; then
+            zip "${{ matrix.archive_name }}" "${{ matrix.bin_name }}" README* LICENSE* 2>/dev/null || zip "${{ matrix.archive_name }}" "${{ matrix.bin_name }}"
+          else
+            tar -czf "${{ matrix.archive_name }}" "${{ matrix.bin_name }}" README* LICENSE* 2>/dev/null || tar -czf "${{ matrix.archive_name }}" "${{ matrix.bin_name }}"
+          fi
+
+
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
-          name: bins-${{ matrix.build }}
-          path: release/${{ matrix.bin_name }}
+          name: ${{ matrix.archive_name }}
+          path: release/${{ matrix.archive_name }}
 
   create-release:
     name: Create Release
@@ -75,15 +112,16 @@ jobs:
     needs: build
 
     steps:
-      - uses: actions/download-artifact@v3
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
         with:
-          name: binaries
           path: binaries
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
-          files: |
-            binaries/*
+          files: binaries/**/*.tar.gz
+          # zip 文件也一并包含
+          additional_files: binaries/**/*.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
