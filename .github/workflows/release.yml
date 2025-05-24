@@ -82,8 +82,7 @@ jobs:
           $binary = "release\${{ matrix.bin_name }}"
           $files = @($binary)
           if (Test-Path -Path "release\README.md")   { $files += "release\README.md" }
-          if (Test-Path -Path "release\LICENSE")     { $files += "release\LICENSE" }
-          if (Test-Path -Path "release\LICENSE.txt") { $files += "release\LICENSE.txt" }
+          if (Test-Path -Path "release\LICENSE-MIT")     { $files += "release\LICENSE-MIT" }
           Compress-Archive -Path $files -DestinationPath "release\$archive"
 
       # ✅ Unix/macOS: use bash + zip/tar
@@ -115,6 +114,7 @@ jobs:
       - name: Download all artifacts
         uses: actions/download-artifact@v3
         with:
+          name: binaries
           path: binaries
 
       - name: Create GitHub Release
