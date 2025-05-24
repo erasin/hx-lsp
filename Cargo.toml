@@ -47,3 +47,10 @@ tokio-util = { version = "0.7.15", features = ["compat"]}
 [profile.release]
 opt-level = "z"
 lto = true
+
+[profile.opt]
+inherits = "release"
+lto = "fat"
+codegen-units = 1
+strip = true
+opt-level = 3
