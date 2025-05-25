@@ -25,15 +25,15 @@ use ropey::Rope;
 use tower::ServiceBuilder;
 use tracing::{Level, info};
 
-use crate::variables::VariableInit;
-use crate::{action::ActionData, snippet::Snippets};
 use crate::{
-    action::Actions,
+    action::{Actions, shell},
+    action_inner::{case_actions, markdown_actions},
     colors::extract_colors,
-    encoding::{get_current_word, is_field},
+    encoding::{get_current_word, get_range_content, is_field},
+    snippet::Snippets,
     state::State,
+    variables::VariableInit,
 };
-use crate::{action::shell, encoding::get_range_content};
 
 /// LSP 服务器
 pub struct Server {
@@ -262,6 +262,8 @@ impl LanguageServer for Server {
         &mut self,
         params: CodeActionParams,
     ) -> BoxFuture<'static, Result<Option<CodeActionResponse>, ResponseError>> {
+        self.state.action_cache_clear();
+
         let uri = params.text_document.uri.clone();
         let state = self.state.clone();
 
@@ -293,9 +295,20 @@ impl LanguageServer for Server {
         let actions = Actions::get_lang(lang_id.clone(), &variable_init);
 
         let actions = actions
-            .to_code_action_items(&variable_init, &params.into())
+            .to_code_action_items(&variable_init, &params.clone().into())
             .iter()
-            .map(|item| item.clone().into())
+            .map(|(action, data)| {
+                self.state
+                    .action_cache_set(action.title.clone(), data.clone());
+                action.clone().into()
+            })
+            .chain(case_actions(range_content.to_string(), &params))
+            .chain(markdown_actions(
+                lang_id,
+                &doc,
+                &range_content.to_string(),
+                &params,
+            ))
             .collect();
 
         Box::pin(async move { Ok(Some(actions)) })
@@ -305,10 +318,11 @@ impl LanguageServer for Server {
         &mut self,
         params: CodeAction,
     ) -> BoxFuture<'static, Result<CodeAction, ResponseError>> {
-        let data: ActionData = serde_json::from_value(params.data.clone().unwrap()).unwrap();
-        let uri = data.text_document.uri;
+        // let data: ActionData = serde_json::from_value(params.data.clone().unwrap()).unwrap();
+        let data = self.state.action_cache_get(params.title.clone()).unwrap();
+        let uri = data.params.text_document.uri;
 
-        let range = data.range;
+        let range = data.params.range;
         let selected = if range.start != range.end {
             let state = self.state.clone();
             let doc = state.get_contents(&uri);
@@ -328,13 +342,13 @@ impl LanguageServer for Server {
             .and_then(|cmd| shell(&cmd, &selected).ok())
             .filter(|o| !o.is_empty())
         {
-            resolved_action.data = Some(serde_json::to_value(output.clone()).unwrap());
+            // resolved_action.data = Some(serde_json::to_value(output.clone()).unwrap());
+            resolved_action.data = None;
             let mut changes = HashMap::new();
             let edits = vec![TextEdit {
-                range: data.range,
+                range: data.params.range,
                 new_text: output,
             }];
-
             changes.insert(uri.clone(), edits);
             resolved_action.edit = Some(WorkspaceEdit::new(changes));
             resolved_action.kind = Some(CodeActionKind::REFACTOR_REWRITE);
@@ -353,13 +367,13 @@ impl LanguageServer for Server {
         let current_hash = self.state.calculate_content_hash(&uri);
 
         // 尝试获取缓存
-        let colors = if let Some(cached_colors) = self.state.get_cached_colors(&uri, current_hash) {
+        let colors = if let Some(cached_colors) = self.state.cached_colors_get(&uri, current_hash) {
             cached_colors
         } else {
             // 缓存处理
             let colors = extract_colors(&doc);
             self.state
-                .update_color_cache(&uri, current_hash, colors.clone());
+                .color_cache_set(&uri, current_hash, colors.clone());
             colors
         };
 

@@ -9,6 +9,11 @@
 - Completion: snippets  (helix#9801)
 - CodeAction: actions
 - Document Color (helix#12308)
+- Word Convert case (action)
+	- case_snake, CasePascal, caseCamel 
+- Markdown Only
+	- Table Formater (action)
+	- Bold/Italic (action)
 
 ## 安装
 

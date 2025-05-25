@@ -9,6 +9,11 @@ An LSP tool that provides custom code snippets and Code Actions for [Helix Edito
 - Completion: snippets (helix#9801)
 - CodeAction: actions 
 - Document Color (helix#12308)
+- Word Convert case (action)
+	- case_snake, CasePascal, caseCamel 
+- Markdown Only
+	- Table Formater (action)
+	- Bold/Italic (action)
 
 ## Install
 

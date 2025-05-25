@@ -8,7 +8,10 @@ use std::{
 };
 use tracing::debug;
 
-use crate::encoding::{OffsetEncoding, lsp_pos_to_pos};
+use crate::{
+    action::ActionData,
+    encoding::{OffsetEncoding, lsp_pos_to_pos},
+};
 
 #[derive(Default, Clone)]
 pub struct State {
@@ -17,6 +20,7 @@ pub struct State {
     pub language_ids: Arc<RwLock<HashMap<Url, String>>>,
     pub color_cache: Arc<RwLock<HashMap<Url, CachedColors>>>, // 新增颜色缓存
     pub client_info: ClientInfo,
+    pub action_cache: Arc<RwLock<HashMap<String, ActionData>>>,
 }
 
 #[derive(Default, Clone)]
@@ -80,7 +84,7 @@ impl State {
         }
 
         // 清理色彩
-        self.clear_color_cache(uri);
+        self.color_cache_clear(uri);
     }
 
     /// 更新文件
@@ -96,7 +100,7 @@ impl State {
         };
         if changed {
             // 内容变更时清除缓存
-            self.clear_color_cache(uri);
+            self.color_cache_clear(uri);
         }
     }
 
@@ -121,7 +125,7 @@ impl State {
             }
         }
 
-        self.clear_color_cache(uri);
+        self.color_cache_clear(uri);
     }
 
     /// 清理关闭的文件
@@ -138,6 +142,10 @@ impl State {
             .write()
             .expect("Failed to write color cache")
             .remove(uri); // 移除文件时清除缓存
+        self.action_cache
+            .write()
+            .expect("Failed to write action cache")
+            .clear();
     }
 
     /// 客户端信息
@@ -145,8 +153,31 @@ impl State {
         self.client_info = ClientInfo { name, version };
     }
 
+    pub fn action_cache_get(&self, name: String) -> Option<ActionData> {
+        let cache = self
+            .action_cache
+            .read()
+            .expect("Failed to read action cache");
+        cache.get(&name).cloned()
+    }
+
+    pub fn action_cache_set(&self, name: String, data: ActionData) {
+        let mut cache = self
+            .action_cache
+            .write()
+            .expect("Failed to write action cache");
+        cache.insert(name, data);
+    }
+
+    pub fn action_cache_clear(&self) {
+        self.action_cache
+            .write()
+            .expect("Failed to write action cache")
+            .clear();
+    }
+
     /// 获取或更新颜色缓存
-    pub fn get_cached_colors(&self, uri: &Url, content_hash: u64) -> Option<Vec<ColorInformation>> {
+    pub fn cached_colors_get(&self, uri: &Url, content_hash: u64) -> Option<Vec<ColorInformation>> {
         let cache = self.color_cache.read().expect("Failed to read color cache");
         cache.get(uri).and_then(|cached| {
             if cached.content_hash == content_hash {
@@ -158,12 +189,7 @@ impl State {
     }
 
     // 更新颜色缓存
-    pub fn update_color_cache(
-        &mut self,
-        uri: &Url,
-        content_hash: u64,
-        colors: Vec<ColorInformation>,
-    ) {
+    pub fn color_cache_set(&mut self, uri: &Url, content_hash: u64, colors: Vec<ColorInformation>) {
         let mut cache = self
             .color_cache
             .write()
@@ -178,7 +204,7 @@ impl State {
     }
 
     // 清理颜色缓存
-    pub fn clear_color_cache(&mut self, uri: &Url) {
+    pub fn color_cache_clear(&mut self, uri: &Url) {
         let mut cache = self
             .color_cache
             .write()

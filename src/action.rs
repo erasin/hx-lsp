@@ -9,9 +9,7 @@ use std::{
 };
 
 use anyhow::{Context, Result};
-use async_lsp::lsp_types::{
-    CodeAction, CodeActionKind, CodeActionParams, Range, TextDocumentIdentifier,
-};
+use async_lsp::lsp_types::{CodeAction, CodeActionKind, CodeActionParams};
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 
@@ -39,21 +37,20 @@ impl Action {
         &self,
         variable_init: &VariableInit,
         data: &ActionData,
-    ) -> Option<CodeAction> {
+    ) -> Option<(CodeAction, ActionData)> {
         let shell = self.shell.to_string();
         let shell = Variables::replace_all(&shell, variable_init);
 
+        // 让其返回到 action/re
         let action = CodeAction {
             title: self.title.clone(),
             kind: Some(CodeActionKind::EMPTY),
-            is_preferred: Some(true),
-            diagnostics: None,
-            disabled: None,
-            data: Some(serde_json::to_value(data.with_command(shell).clone()).unwrap()),
+            data: None,
             ..Default::default()
         };
+        // data: Some(serde_json::to_value(data.with_command(shell).clone()).unwrap()),
 
-        Some(action)
+        Some((action, data.with_command(shell)))
     }
 
     /// 获取 description, 兼容空对象
@@ -68,8 +65,7 @@ impl Action {
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct ActionData {
-    pub text_document: TextDocumentIdentifier,
-    pub range: Range,
+    pub params: CodeActionParams,
     pub command: Option<String>,
 }
 
@@ -85,8 +81,7 @@ impl ActionData {
 impl From<CodeActionParams> for ActionData {
     fn from(value: CodeActionParams) -> Self {
         ActionData {
-            text_document: value.text_document.clone(),
-            range: value.range,
+            params: value.clone(),
             command: None,
         }
     }
@@ -164,7 +159,7 @@ impl Actions {
         &self,
         variable_init: &VariableInit,
         data: &ActionData,
-    ) -> Vec<CodeAction> {
+    ) -> Vec<(CodeAction, ActionData)> {
         self.actions
             .iter()
             .filter_map(|(_name, action)| action.to_code_action_item(variable_init, data))
@@ -206,7 +201,7 @@ fn from_files(name: String, files: Vec<PathBuf>) -> Actions {
         .filter(|p| p.exists())
         .filter_map(|p| parse::<Actions>(&p, name.to_owned()).ok())
         .fold(
-            Actions::new(name.to_owned(), HashMap::new()),
+            Actions::new(name.trim().to_owned(), HashMap::new()),
             |mut acc, map| {
                 acc.extend(map);
                 acc
