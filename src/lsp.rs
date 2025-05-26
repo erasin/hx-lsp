@@ -319,7 +319,11 @@ impl LanguageServer for Server {
         params: CodeAction,
     ) -> BoxFuture<'static, Result<CodeAction, ResponseError>> {
         // let data: ActionData = serde_json::from_value(params.data.clone().unwrap()).unwrap();
-        let data = self.state.action_cache_get(params.title.clone()).unwrap();
+        let data = self
+            .state
+            .action_cache_get(params.title.clone())
+            .expect("Unkown Action");
+
         let uri = data.params.text_document.uri;
 
         let range = data.params.range;
