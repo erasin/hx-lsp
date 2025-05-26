@@ -13,7 +13,8 @@ An LSP tool that provides custom code snippets and Code Actions for [Helix Edito
 	- case_snake, CasePascal, caseCamel 
 - Markdown Only
 	- Table Formater (action)
-	- Bold/Italic (action)
+	- Order,Unorder,Task List (action)
+	- Bold/Italic/Strikethrough (action)
 
 ## Install
 

@@ -7,6 +7,8 @@ use convert_case::{Case, Casing};
 use regex::Regex;
 use ropey::Rope;
 
+use crate::encoding::get_range_content;
+
 pub(super) fn case_actions(
     range_content: String,
     params: &CodeActionParams,
@@ -71,7 +73,61 @@ pub(super) fn markdown_actions(
         let line_2 = doc.get_line(params.range.start.line as usize + 1).unwrap();
         if md_table_line_rg().is_match(line_2.to_string().trim()) {
             let out = markdown_table_formatter::format_tables(range_content);
-            items.push(("TableFormat", out));
+            items.push(("Table Format", out));
+        }
+    }
+
+    if params.range.end.line != params.range.start.line {
+        let range_content = get_range_content(doc, &params.range).unwrap_or("".into());
+
+        if !range_content.char(0).is_numeric() && range_content.char(1) != '.' {
+            let order_content: String = range_content
+                .lines()
+                .enumerate()
+                .map(|(index, line)| {
+                    let line = line.to_string();
+                    if (params.range.end.line - params.range.start.line) as usize == index
+                        && params.range.end.character == 0
+                    {
+                        return line;
+                    }
+                    format!("{}. {line}", (index + 1))
+                })
+                .collect();
+            items.push(("Ordered List", order_content));
+        }
+
+        if range_content.char(0) != '-' {
+            let unorder_content: String = range_content
+                .lines()
+                .enumerate()
+                .map(|(index, line)| {
+                    let line = line.to_string();
+                    if (params.range.end.line - params.range.start.line) as usize == index
+                        && params.range.end.character == 0
+                    {
+                        return line;
+                    }
+                    format!("- {line}")
+                })
+                .collect();
+
+            let task_content: String = range_content
+                .lines()
+                .enumerate()
+                .map(|(index, line)| {
+                    let line = line.to_string();
+                    if (params.range.end.line - params.range.start.line) as usize == index
+                        && params.range.end.character == 0
+                    {
+                        return line;
+                    }
+                    format!("- [ ] {line}")
+                })
+                .collect();
+
+            items.push(("Unordered List", unorder_content));
+            items.push(("Task List", task_content));
         }
     }
 
@@ -79,6 +135,7 @@ pub(super) fn markdown_actions(
     if params.range.start.line == params.range.end.line {
         items.push(("Bold", format!("**{range_content}**")));
         items.push(("Italic", format!("_{range_content}_")));
+        items.push(("Strikethrough", format!("~{range_content}~")));
     }
 
     items
