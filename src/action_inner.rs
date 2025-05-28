@@ -28,8 +28,11 @@ pub(super) fn case_actions(
 
     items
         .iter()
-        .map(|&(item, case)| {
+        .filter_map(|&(item, case)| {
             let out = range_content.to_case(case);
+            if out.eq(&range_content) {
+                return None;
+            }
 
             let mut changes = HashMap::new();
             let edits = vec![TextEdit {
@@ -38,13 +41,15 @@ pub(super) fn case_actions(
             }];
             changes.insert(params.text_document.uri.clone(), edits);
 
-            CodeAction {
-                title: item.to_string(),
-                kind: Some(CodeActionKind::REFACTOR_REWRITE),
-                edit: Some(WorkspaceEdit::new(changes)),
-                ..Default::default()
-            }
-            .into()
+            Some(
+                CodeAction {
+                    title: item.to_string(),
+                    kind: Some(CodeActionKind::REFACTOR_REWRITE),
+                    edit: Some(WorkspaceEdit::new(changes)),
+                    ..Default::default()
+                }
+                .into(),
+            )
         })
         .collect()
 }
@@ -67,9 +72,8 @@ pub(super) fn markdown_actions(
 
     let mut items = Vec::new();
 
-    // 多行
+    // 表格必须为三行以上，第二行为 `- :|`
     if params.range.end.line - params.range.start.line > 1 {
-        // 表格必须为三行以上，第二行以 `--` 开头
         let line_2 = doc.get_line(params.range.start.line as usize + 1).unwrap();
         if md_table_line_rg().is_match(line_2.to_string().trim()) {
             let out = markdown_table_formatter::format_tables(range_content);
@@ -97,7 +101,7 @@ pub(super) fn markdown_actions(
             items.push(("Ordered List", order_content));
         }
 
-        if range_content.char(0) != '-' {
+        if range_content.char(0) != '-' && range_content.char(1) != ' ' {
             let unorder_content: String = range_content
                 .lines()
                 .enumerate()
@@ -135,7 +139,7 @@ pub(super) fn markdown_actions(
     if params.range.start.line == params.range.end.line {
         items.push(("Bold", format!("**{range_content}**")));
         items.push(("Italic", format!("_{range_content}_")));
-        items.push(("Strikethrough", format!("~{range_content}~")));
+        items.push(("Strikethrough", format!("~~{range_content}~~")));
     }
 
     items
