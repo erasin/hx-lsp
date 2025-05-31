@@ -137,6 +137,8 @@ impl LanguageServer for Server {
                         CodeActionOptions {
                             code_action_kinds: Some(vec![
                                 CodeActionKind::EMPTY,
+                                CodeActionKind::REFACTOR,
+                                CodeActionKind::REFACTOR_INLINE,
                                 CodeActionKind::REFACTOR_REWRITE,
                             ]),
                             resolve_provider: Some(true),
@@ -303,12 +305,7 @@ impl LanguageServer for Server {
                 action.clone().into()
             })
             .chain(case_actions(range_content.to_string(), &params))
-            .chain(markdown_actions(
-                lang_id,
-                &doc,
-                &range_content.to_string(),
-                &params,
-            ))
+            .chain(markdown_actions(lang_id, &doc, &params))
             .collect();
 
         Box::pin(async move { Ok(Some(actions)) })
@@ -319,10 +316,13 @@ impl LanguageServer for Server {
         params: CodeAction,
     ) -> BoxFuture<'static, Result<CodeAction, ResponseError>> {
         // let data: ActionData = serde_json::from_value(params.data.clone().unwrap()).unwrap();
-        let data = self
-            .state
-            .action_cache_get(params.title.clone())
-            .expect("Unkown Action");
+        let data = self.state.action_cache_get(params.title.clone());
+
+        if data.is_none() {
+            return Box::pin(async move { Ok(params) });
+        }
+
+        let data = data.unwrap();
 
         let uri = data.params.text_document.uri;
 
