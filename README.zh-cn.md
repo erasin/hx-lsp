@@ -15,7 +15,7 @@
 	- 小驼峰(caseCamel)
 - Markdown 支持
 	- 表格格式化(Table Formater) (action) ，
-			条件为选择区域的第二行为 ` |:-` 组成
+			条件为选择区域的存在表头，即为 ` |:-` 组成内容行
 	- 粗体(Bold)/斜体(Italic)/删除(Strikethrough )(action)
 	- 有序列表(Order),无序列表(Unorder),任务列表(Task List) (action)
 

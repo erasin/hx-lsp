@@ -16,7 +16,7 @@ pub(super) fn case_actions(
     if params.range.start.line != params.range.end.line {
         return Vec::new();
     }
-    if !range_content.is_ascii() {
+    if range_content.len() == 1 || !range_content.is_ascii() {
         return Vec::new();
     }
 
@@ -72,10 +72,14 @@ pub(super) fn markdown_actions(
 
     let mut items = Vec::new();
 
-    // 表格必须为三行以上，第二行为 `- :|`
+    // 表格必须为三行以上，第二行起存在表头为 `- :|`
     if params.range.end.line - params.range.start.line > 1 {
-        let line_2 = doc.get_line(params.range.start.line as usize + 1).unwrap();
-        if md_table_line_rg().is_match(line_2.to_string().trim()) {
+        let has_table = doc
+            .lines_at(params.range.start.line as usize)
+            .skip(1)
+            .any(|line| md_table_line_rg().is_match(line.to_string().trim()));
+
+        if has_table {
             let out = markdown_table_formatter::format_tables(range_content);
             items.push(("Table Format", out));
         }

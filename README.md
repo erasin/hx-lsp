@@ -15,8 +15,9 @@ An LSP tool that provides custom code snippets and Code Actions for [Helix Edito
 	- caseCamel 
 - Markdown Only
 	- Table Formater (action)
-			The second line of the selected area consists of '|: -'.
+			The line of the selected area consists of '|: -'.
 	- Order,Unorder,Task List (action)
+	- Task done toggle (action)
 	- Bold/Italic/Strikethrough (action)
 
 ## Install
