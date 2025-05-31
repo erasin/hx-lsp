@@ -10,9 +10,12 @@ An LSP tool that provides custom code snippets and Code Actions for [Helix Edito
 - CodeAction: actions 
 - Document Color (helix#12308)
 - Word Convert case (action)
-	- case_snake, CasePascal, caseCamel 
+  - case_snake
+	- CasePascal
+	- caseCamel 
 - Markdown Only
 	- Table Formater (action)
+			The second line of the selected area consists of '|: -'.
 	- Order,Unorder,Task List (action)
 	- Bold/Italic/Strikethrough (action)
 

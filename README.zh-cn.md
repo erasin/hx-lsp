@@ -6,14 +6,18 @@
 
 ## 功能
 
-- Completion: snippets  (helix#9801)
-- CodeAction: actions
-- Document Color (helix#12308)
-- Word Convert case (action)
-	- case_snake, CasePascal, caseCamel 
-- Markdown Only
-	- Table Formater (action)
-	- Bold/Italic (action)
+- Completion: 代码片段(snippets)   (helix#9801)
+- CodeAction: actions 根据条件执行脚本
+- Document Color (helix#12308) 支持文本色彩
+- Word Convert case (action)  单词风格转换
+	- 下划线(case_snake)
+	- 大驼峰(CasePascal)
+	- 小驼峰(caseCamel)
+- Markdown 支持
+	- 表格格式化(Table Formater) (action) ，
+			条件为选择区域的第二行为 ` |:-` 组成
+	- 粗体(Bold)/斜体(Italic)/删除(Strikethrough )(action)
+	- 有序列表(Order),无序列表(Unorder),任务列表(Task List) (action)
 
 ## 安装
 
