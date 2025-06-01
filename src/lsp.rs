@@ -27,9 +27,10 @@ use tracing::{Level, info};
 
 use crate::{
     action::{Actions, shell},
-    action_inner::{case_actions, markdown_actions},
+    action_inner::case_actions,
     colors::extract_colors,
     encoding::{get_current_word, get_range_content, is_field},
+    markdown,
     snippet::Snippets,
     state::State,
     variables::VariableInit,
@@ -304,8 +305,8 @@ impl LanguageServer for Server {
                     .action_cache_set(action.title.clone(), data.clone());
                 action.clone().into()
             })
-            .chain(case_actions(range_content.to_string(), &params))
-            .chain(markdown_actions(lang_id, &doc, &params))
+            .chain(case_actions(range_content, &params))
+            .chain(markdown::actions(lang_id, &doc, &params))
             .collect();
 
         Box::pin(async move { Ok(Some(actions)) })

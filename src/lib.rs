@@ -11,6 +11,7 @@ pub mod errors;
 pub mod fuzzy;
 pub mod loader;
 pub mod lsp;
+pub mod markdown;
 pub mod parser;
 pub mod snippet;
 pub mod state;
