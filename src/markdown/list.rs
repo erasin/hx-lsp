@@ -73,21 +73,8 @@ pub fn convert_to_list(
             // 跳过空行
             if line.to_string().trim().is_empty() {
                 current_levels.clear();
-                // prev_indent = None;
                 return None;
             }
-
-            // // 确定是否需要添加列表标记
-            // let mut add_prefix = true;
-            // if let Some(prev) = prev_indent {
-            //     // 如果当前行与上一行缩进相同，且上一行添加了前缀，则继续添加
-            //     add_prefix = indent == prev;
-            // }
-            // prev_indent = Some(indent);
-
-            // if !add_prefix {
-            //     return None;
-            // }
 
             // 更新缩进层级栈
             while !current_levels.is_empty() && *current_levels.last().unwrap() > indent {

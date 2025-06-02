@@ -17,7 +17,6 @@ An LSP tool that provides custom code snippets and Code Actions for [Helix Edito
 	- Table Formater (action)
 			The line of the selected area consists of '|: -'.
 	- Order,Unorder,Task List (action)
-	- Task done toggle (action)
 	- Bold/Italic/Strikethrough (action)
 
 ## Install

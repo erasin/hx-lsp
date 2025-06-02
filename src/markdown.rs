@@ -23,7 +23,6 @@ pub(super) fn actions(
     let range_content = get_range_content(doc, &params.range).unwrap_or("".into());
     let mut items = Vec::new();
 
-    // 表格必须为三行以上，第二行起存在表头为 `- :|`
     if params.range.end.line - params.range.start.line > 1 {
         items.push(("Table Format", table::format(range_content, params.range)));
     }
@@ -63,13 +62,6 @@ pub(super) fn actions(
                 new_text: format!("~~{range_content}~~"),
             }],
         ));
-
-        // 单字符选择
-        if params.range.start.character + 1 == params.range.end.character {
-            // let line = doc.line(params.range.start.line as usize);
-            // line.chars().find_map(f)
-            // TODO TextEdit
-        }
     }
 
     items
