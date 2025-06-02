@@ -10,10 +10,6 @@ use unicode_width::UnicodeWidthStr;
 
 /// 格式化 Markdown 表格
 pub fn format(rope: RopeSlice, range: Range) -> Vec<TextEdit> {
-    // 提取选中文本
-    // let selected_text: String =
-    // 解析表格
-    // let (header, alignments, rows, table_range) = parse_tables(rope, start_line)?;
     let tables = parse_tables(rope, range.start);
     tables
         .iter()
@@ -34,7 +30,6 @@ pub fn format(rope: RopeSlice, range: Range) -> Vec<TextEdit> {
 
                 let new_text = rows.join("\n");
 
-                // 返回文本编辑操作
                 TextEdit {
                     range: *range,
                     new_text,
@@ -55,7 +50,6 @@ struct Table {
 
 /// 解析表格内容
 fn parse_tables(rope: RopeSlice, start_line: Position) -> Vec<Table> {
-    // 使用 Comrak 解析 Markdown
     let arena = Arena::new();
     let options = ComrakOptions {
         extension: ExtensionOptions {
@@ -101,7 +95,7 @@ fn parse_tables(rope: RopeSlice, start_line: Position) -> Vec<Table> {
             // 遍历表格的子节点
             for node in table_node.children() {
                 match &node.data.borrow().value {
-                    // 表头是第一个 TableRow
+                    // 表头
                     NodeValue::TableRow(true) if header.is_empty() => {
                         header = extract_row_cells(node, rope);
                     }
@@ -113,7 +107,6 @@ fn parse_tables(rope: RopeSlice, start_line: Position) -> Vec<Table> {
                 }
             }
 
-            // 确保我们有足够的数据
             if alignments.is_empty() {
                 return None;
             }
