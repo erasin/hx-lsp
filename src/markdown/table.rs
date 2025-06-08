@@ -5,7 +5,6 @@ use comrak::{
     parse_document,
 };
 use ropey::RopeSlice;
-use tracing::info;
 use unicode_width::UnicodeWidthStr;
 
 /// 格式化 Markdown 表格
@@ -121,8 +120,6 @@ fn parse_tables(rope: RopeSlice, start_line: Position) -> Vec<Table> {
                 range: table_range,
             };
 
-            info!("TABLE: {:?}", table);
-
             Some(table)
         })
         .collect()
@@ -163,15 +160,15 @@ fn extract_row_cells<'a>(row_node: &'a AstNode<'a>, rope: RopeSlice) -> Vec<Stri
 
     for cell in row_node.children() {
         if let NodeValue::TableCell = cell.data.borrow().value {
-            let sourcepos = cell.data.borrow().sourcepos;
+            let pos = cell.data.borrow().sourcepos;
 
-            let start_byte = sourcepos.start.column - 1;
-            let end_byte = sourcepos.end.column;
+            let start_byte = pos.start.column - 1;
+            let end_byte = pos.end.column;
 
             // 从 RopeSlice 中提取单元格文本
             if let Some(slice) = rope
-                .line(sourcepos.start.line - 1)
-                .get_slice(start_byte..end_byte)
+                .line(pos.start.line - 1)
+                .get_byte_slice(start_byte..end_byte)
             {
                 cells.push(slice.to_string().trim().to_string());
             } else {
@@ -198,9 +195,10 @@ fn calculate_column_widths(
         .cloned()
         .chain(vec![header.to_vec()])
         .for_each(|row| {
-            row.iter()
-                .enumerate()
-                .for_each(|(i, cell)| widths[i] = widths[i].max(cell.width()));
+            row.iter().enumerate().for_each(|(i, cell)| {
+                // info!("WIDTH: {cell} {}", cell.width());
+                widths[i] = widths[i].max(cell.width())
+            });
         });
 
     widths
@@ -213,18 +211,17 @@ fn format_row(cells: &[String], col_widths: &[usize], alignments: &[TableAlignme
         .zip(col_widths)
         .zip(alignments)
         .map(|((cell, width), alignment)| {
+            let cell_width = cell.width();
+            let pad = width - cell_width;
             // 根据对齐方式格式化单元格
             match alignment {
-                TableAlignment::Left => format!(" {:<width$} ", cell, width = width),
-                TableAlignment::Right => format!(" {:>width$} ", cell, width = width),
+                TableAlignment::Right => format!(" {}{cell} ", " ".repeat(pad)),
                 TableAlignment::Center => {
-                    let cell_width = cell.width();
-
                     if cell_width >= *width {
                         format!(" {} ", cell,)
                     } else {
-                        let left_pad = (width - cell_width) / 2;
-                        let right_pad = width - cell_width - left_pad;
+                        let left_pad = pad / 2;
+                        let right_pad = pad - left_pad;
                         format!(
                             " {}{}{} ",
                             " ".repeat(left_pad),
@@ -233,7 +230,7 @@ fn format_row(cells: &[String], col_widths: &[usize], alignments: &[TableAlignme
                         )
                     }
                 }
-                _ => format!(" {:<width$} ", cell, width = width), // 默认左对齐
+                _ => format!(" {cell}{} ", " ".repeat(pad)),
             }
         })
         .collect();
