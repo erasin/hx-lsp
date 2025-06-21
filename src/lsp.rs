@@ -243,7 +243,10 @@ impl LanguageServer for Server {
             None => snippets,
         };
 
-        let mut clipboard_ctx = ClipboardContext::new().unwrap();
+        let clipboard_content = match ClipboardContext::new() {
+            Ok(mut clip) => clip.get_contents().ok(),
+            Err(_) => None,
+        };
 
         let variable_init = VariableInit {
             file_path: uri.to_file_path().unwrap(),
@@ -253,7 +256,7 @@ impl LanguageServer for Server {
             line_text: line.to_string(),
             current_word: cursor_word,
             selected_text: Default::default(),
-            clipboard: clipboard_ctx.get_contents().ok(),
+            clipboard: clipboard_content,
         };
 
         let items = snippets.to_completion_items(&variable_init);
@@ -282,7 +285,10 @@ impl LanguageServer for Server {
         // 当前 选择区域
         let range_content = get_range_content(&doc, &params.range).unwrap_or("".into());
 
-        let mut clipboard_ctx = ClipboardContext::new().unwrap();
+        let clipboard_content = match ClipboardContext::new() {
+            Ok(mut clip) => clip.get_contents().ok(),
+            Err(_) => None,
+        };
 
         let variable_init = VariableInit {
             file_path: uri.to_file_path().unwrap(),
@@ -292,7 +298,7 @@ impl LanguageServer for Server {
             line_text: line.to_string(),
             current_word: cursor_word.to_string(),
             selected_text: range_content.to_string(),
-            clipboard: clipboard_ctx.get_contents().ok(),
+            clipboard: clipboard_content,
         };
 
         let actions = Actions::get_lang(lang_id.clone(), &variable_init);
