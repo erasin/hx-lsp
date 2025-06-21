@@ -6,6 +6,9 @@
 
 ## 功能
 
+- LSP 命令
+	- reload snippets 重载 snippets
+	- reload actions 重载 actions
 - Completion: 代码片段(snippets)   (helix#9801)
 - CodeAction: actions 根据条件执行脚本
 - Document Color (helix#12308) 支持文本色彩
@@ -88,7 +91,7 @@ language-servers = [ "marksman", "markdown-oxide", { name = "hx-lsp", only-featu
 
 hx-lsp 会在打开文件的时候自动加载配置语言的相关文件。
 
-> 暂不支持配置文件的动态加载，修改配置文件后，可以使用 `:lsp-restart` 重启来重新加载文件。
+> 使用命令 `:lsp-workspace-command` 唤起服务器命令来选择重载 snippets 或者 actions.
 
 ## Completion: snippets
 

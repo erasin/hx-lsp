@@ -78,6 +78,11 @@ fn snippets_list() -> &'static Mutex<HashMap<String, Snippets>> {
     SNIPPETS.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
+pub(crate) fn snippets_list_clear() {
+    let mut snippets_list = snippets_list().lock();
+    snippets_list.clear();
+}
+
 /// 语言包
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct Snippets {

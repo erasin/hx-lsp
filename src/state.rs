@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use async_lsp::lsp_types::{ColorInformation, Position, TextDocumentContentChangeEvent, Url};
 use ropey::Rope;
 use std::{
@@ -9,8 +10,9 @@ use std::{
 use tracing::debug;
 
 use crate::{
-    action::ActionData,
+    action::{ActionData, actions_list_clear},
     encoding::{OffsetEncoding, lsp_pos_to_pos},
+    snippet::snippets_list_clear,
 };
 
 #[derive(Default, Clone)]
@@ -210,6 +212,20 @@ impl State {
             .write()
             .expect("Failed to write color cache");
         cache.remove(uri);
+    }
+
+    pub fn execute_command(&self, command: &str) -> anyhow::Result<()> {
+        match command {
+            "reload actions" => {
+                actions_list_clear();
+                Ok(())
+            }
+            "reload snippets" => {
+                snippets_list_clear();
+                Ok(())
+            }
+            _ => Err(anyhow!("unknow")),
+        }
     }
 }
 

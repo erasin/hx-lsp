@@ -6,6 +6,9 @@ An LSP tool that provides custom code snippets and Code Actions for [Helix Edito
 
 ## Features
 
+- LSP Command
+	- reload snippets
+	- reload actions
 - Completion: snippets (helix#9801)
 - CodeAction: actions 
 - Document Color (helix#12308)
@@ -60,7 +63,7 @@ language-servers = [ "marksman", "markdown-oxide", { name = "hx-lsp", only-featu
 
 > About `language id`, Read [helix/languages.toml](https://github.com/helix-editor/helix/blob/master/languages.toml) and [helix wiki language server configurations](https://github.com/helix-editor/helix/wiki/Language-Server-Configurations)。
 
-> helix lsp 使用 `only-features` 和 `except-features ` 来过滤功能。
+> helix lsp support options `only-features` and `except-features ` filter server features。
 > hx-lsp 支持
 >   - completion
 >   - code-action
@@ -85,7 +88,7 @@ Actions file loading path:
 
 In LSP `textDocument/didOpen` request, The Configuration file with name that is `language_id.json` will be loading.
 
-> Unsupported Dynamic loading config. If you modify configuration file, use `:lsp-restart` to restart lsp and reload the file. 
+> Use `:lsp-workspace-command` open picker, and reload snippets or actions script.
 
 
 ## Completion: snippets

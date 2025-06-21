@@ -1,7 +1,7 @@
 use std::{collections::HashMap, ops::ControlFlow, time::Duration};
 
 use async_lsp::{
-    ClientSocket, LanguageServer, ResponseError,
+    ClientSocket, ErrorCode, LanguageServer, ResponseError,
     client_monitor::ClientProcessMonitorLayer,
     concurrency::ConcurrencyLayer,
     lsp_types::{
@@ -10,9 +10,10 @@ use async_lsp::{
         ColorProviderCapability, CompletionOptions, CompletionParams, CompletionResponse,
         DidChangeConfigurationParams, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
         DidOpenTextDocumentParams, DidSaveTextDocumentParams, DocumentColorParams,
-        InitializeParams, InitializeResult, PositionEncodingKind, SaveOptions, ServerCapabilities,
+        ExecuteCommandOptions, ExecuteCommandParams, InitializeParams, InitializeResult,
+        PositionEncodingKind, SaveOptions, ServerCapabilities, ServerInfo,
         TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
-        TextDocumentSyncSaveOptions, TextEdit, WorkspaceEdit,
+        TextDocumentSyncSaveOptions, TextEdit, WorkDoneProgressOptions, WorkspaceEdit,
     },
     panic::CatchUnwindLayer,
     router::Router,
@@ -162,9 +163,18 @@ impl LanguageServer for Server {
                             })),
                         },
                     )),
+                    execute_command_provider: Some(ExecuteCommandOptions {
+                        commands: vec!["reload snippets".to_string(), "reload actions".to_string()],
+                        work_done_progress_options: WorkDoneProgressOptions {
+                            work_done_progress: Some(true),
+                        },
+                    }),
                     ..Default::default()
                 },
-                server_info: None,
+                server_info: Some(ServerInfo {
+                    name: env!("CARGO_PKG_NAME").to_string(),
+                    version: Some(env!("CARGO_PKG_VERSION").to_string()),
+                }),
             })
         })
     }
@@ -389,6 +399,22 @@ impl LanguageServer for Server {
         };
 
         Box::pin(async move { Ok(colors) })
+    }
+
+    fn execute_command(
+        &mut self,
+        params: ExecuteCommandParams,
+    ) -> BoxFuture<'static, Result<Option<serde_json::Value>, ResponseError>> {
+        if let Err(e) = self.state.execute_command(&params.command) {
+            return Box::pin(async move {
+                Err(ResponseError::new(
+                    ErrorCode::INTERNAL_ERROR,
+                    format!("Command execution failed: {}", e),
+                ))
+            });
+        }
+
+        Box::pin(async move { Ok(None) })
     }
 
     fn shutdown(&mut self, _: ()) -> BoxFuture<'static, Result<(), ResponseError>> {

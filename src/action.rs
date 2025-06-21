@@ -92,6 +92,11 @@ fn actions_list() -> &'static Mutex<HashMap<String, Actions>> {
     ACTIONS.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
+pub(crate) fn actions_list_clear() {
+    let mut actions_list = actions_list().lock();
+    actions_list.clear();
+}
+
 /// 语言包
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct Actions {
