@@ -218,7 +218,7 @@ fn format_row(cells: &[String], col_widths: &[usize], alignments: &[TableAlignme
                 TableAlignment::Right => format!(" {}{cell} ", " ".repeat(pad)),
                 TableAlignment::Center => {
                     if cell_width >= *width {
-                        format!(" {} ", cell,)
+                        format!(" {cell} ")
                     } else {
                         let left_pad = pad / 2;
                         let right_pad = pad - left_pad;

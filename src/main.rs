@@ -1,4 +1,4 @@
-use hx_lsp::{lsp::Server, variables};
+use hx_lsp::{serve::Server, variables};
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {

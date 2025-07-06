@@ -191,7 +191,8 @@ impl LanguageServer for Server {
         let content = Rope::from(params.text_document.text);
         let language_id = params.text_document.language_id;
 
-        self.state.open_file(&uri, content, Some(language_id));
+        self.state
+            .on_document_open(&uri, content, Some(language_id));
 
         ControlFlow::Continue(())
     }
@@ -200,7 +201,7 @@ impl LanguageServer for Server {
         let uri = params.text_document.uri;
 
         if !params.content_changes.is_empty() {
-            self.state.change_file(&uri, params.content_changes);
+            self.state.on_document_change(&uri, params.content_changes);
         }
         ControlFlow::Continue(())
     }
@@ -208,13 +209,13 @@ impl LanguageServer for Server {
     fn did_save(&mut self, params: DidSaveTextDocumentParams) -> Self::NotifyResult {
         let uri = params.text_document.uri;
         let content = Rope::from(params.text.unwrap());
-        self.state.apply_content_change(&uri, content);
+        self.state.on_document_save(&uri, content);
         ControlFlow::Continue(())
     }
 
     fn did_close(&mut self, params: DidCloseTextDocumentParams) -> Self::NotifyResult {
         let uri = params.text_document.uri;
-        self.state.clean_file(&uri);
+        self.state.clean(&uri);
         ControlFlow::Continue(())
     }
 
@@ -224,7 +225,7 @@ impl LanguageServer for Server {
     ) -> BoxFuture<'static, Result<Option<CompletionResponse>, ResponseError>> {
         let uri = params.text_document_position.text_document.uri;
         let pos = params.text_document_position.position;
-        let doc = self.state.get_contents(&uri);
+        let doc = self.state.get_document(&uri);
         let lang_id = self.state.get_language_id(&uri);
         let root = self.state.root.clone();
         let snippets = [
@@ -278,12 +279,12 @@ impl LanguageServer for Server {
         &mut self,
         params: CodeActionParams,
     ) -> BoxFuture<'static, Result<Option<CodeActionResponse>, ResponseError>> {
-        self.state.action_cache_clear();
+        self.state.clear_action();
 
         let uri = params.text_document.uri.clone();
         let state = self.state.clone();
 
-        let doc = state.get_contents(&uri);
+        let doc = state.get_document(&uri);
         let lang_id = state.get_language_id(&uri);
         let root = state.root.clone();
 
@@ -317,8 +318,7 @@ impl LanguageServer for Server {
             .to_code_action_items(&variable_init, &params.clone().into())
             .iter()
             .map(|(action, data)| {
-                self.state
-                    .action_cache_set(action.title.clone(), data.clone());
+                self.state.set_action(action.title.clone(), data.clone());
                 action.clone().into()
             })
             .chain(case_actions(range_content, &params))
@@ -332,21 +332,18 @@ impl LanguageServer for Server {
         &mut self,
         params: CodeAction,
     ) -> BoxFuture<'static, Result<CodeAction, ResponseError>> {
-        // let data: ActionData = serde_json::from_value(params.data.clone().unwrap()).unwrap();
-        let data = self.state.action_cache_get(params.title.clone());
-
-        if data.is_none() {
+        let data = if let Some(data) = self.state.get_action(params.title.clone()) {
+            data
+        } else {
             return Box::pin(async move { Ok(params) });
-        }
-
-        let data = data.unwrap();
+        };
 
         let uri = data.params.text_document.uri;
 
         let range = data.params.range;
         let selected = if range.start != range.end {
             let state = self.state.clone();
-            let doc = state.get_contents(&uri);
+            let doc = state.get_document(&uri);
             // let lang_id = state.get_language_id(&uri);
             // let root = state.root.clone();
             let range_content = get_range_content(&doc, &range).unwrap_or("".into()).into();
@@ -383,18 +380,17 @@ impl LanguageServer for Server {
         params: DocumentColorParams,
     ) -> BoxFuture<'static, Result<Vec<ColorInformation>, ResponseError>> {
         let uri = params.text_document.uri;
-        let doc = self.state.get_contents(&uri);
+        let doc = self.state.get_document(&uri);
 
         let current_hash = self.state.calculate_content_hash(&uri);
 
         // 尝试获取缓存
-        let colors = if let Some(cached_colors) = self.state.cached_colors_get(&uri, current_hash) {
+        let colors = if let Some(cached_colors) = self.state.get_color(&uri, current_hash) {
             cached_colors
         } else {
             // 缓存处理
             let colors = extract_colors(&doc);
-            self.state
-                .color_cache_set(&uri, current_hash, colors.clone());
+            self.state.set_color(&uri, current_hash, colors.clone());
             colors
         };
 
@@ -409,7 +405,7 @@ impl LanguageServer for Server {
             return Box::pin(async move {
                 Err(ResponseError::new(
                     ErrorCode::INTERNAL_ERROR,
-                    format!("Command execution failed: {}", e),
+                    format!("Command execution failed: {e}"),
                 ))
             });
         }

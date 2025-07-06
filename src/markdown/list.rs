@@ -107,7 +107,7 @@ pub fn convert_to_list(
                         .join(".");
 
                     // 生成有序列表前缀
-                    format!("{}. ", prefix)
+                    format!("{prefix}. ")
                 }
                 ListType::Unordered => {
                     // 无序列表使用相同的标记

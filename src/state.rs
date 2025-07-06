@@ -51,7 +51,7 @@ impl State {
         hasher.finish()
     }
 
-    pub fn get_contents(&self, uri: &Url) -> Rope {
+    pub fn get_document(&self, uri: &Url) -> Rope {
         self.documents
             .read()
             .expect("Get Content Fail")
@@ -70,7 +70,7 @@ impl State {
     }
 
     /// 打开文件时候保存处理
-    pub fn open_file(&mut self, uri: &Url, content: Rope, language_id: Option<String>) {
+    pub fn on_document_open(&mut self, uri: &Url, content: Rope, language_id: Option<String>) {
         debug!("upsert file: {}", uri);
 
         if let Some(language_id) = language_id {
@@ -86,11 +86,11 @@ impl State {
         }
 
         // 清理色彩
-        self.color_cache_clear(uri);
+        self.clear_color(uri);
     }
 
     /// 更新文件
-    pub fn apply_content_change(&mut self, uri: &Url, content: Rope) {
+    pub fn on_document_save(&mut self, uri: &Url, content: Rope) {
         let changed = {
             let mut docs = self.documents.write().expect("Failed to write documents");
             if let Some(doc) = docs.get_mut(uri) {
@@ -102,12 +102,12 @@ impl State {
         };
         if changed {
             // 内容变更时清除缓存
-            self.color_cache_clear(uri);
+            self.clear_color(uri);
         }
     }
 
     /// 变更内容
-    pub fn change_file(&mut self, uri: &Url, contents: Vec<TextDocumentContentChangeEvent>) {
+    pub fn on_document_change(&mut self, uri: &Url, contents: Vec<TextDocumentContentChangeEvent>) {
         if let Some(doc) = self
             .documents
             .write()
@@ -127,11 +127,11 @@ impl State {
             }
         }
 
-        self.color_cache_clear(uri);
+        self.clear_color(uri);
     }
 
     /// 清理关闭的文件
-    pub fn clean_file(&self, uri: &Url) {
+    pub fn clean(&self, uri: &Url) {
         self.documents
             .write()
             .expect("Failed to write documents")
@@ -155,23 +155,22 @@ impl State {
         self.client_info = ClientInfo { name, version };
     }
 
-    pub fn action_cache_get(&self, name: String) -> Option<ActionData> {
-        let cache = self
-            .action_cache
+    pub fn get_action(&self, name: String) -> Option<ActionData> {
+        self.action_cache
             .read()
-            .expect("Failed to read action cache");
-        cache.get(&name).cloned()
+            .expect("Failed to read action cache")
+            .get(&name)
+            .cloned()
     }
 
-    pub fn action_cache_set(&self, name: String, data: ActionData) {
-        let mut cache = self
-            .action_cache
+    pub fn set_action(&self, name: String, data: ActionData) {
+        self.action_cache
             .write()
-            .expect("Failed to write action cache");
-        cache.insert(name, data);
+            .expect("Failed to write action cache")
+            .insert(name, data);
     }
 
-    pub fn action_cache_clear(&self) {
+    pub fn clear_action(&self) {
         self.action_cache
             .write()
             .expect("Failed to write action cache")
@@ -179,39 +178,40 @@ impl State {
     }
 
     /// 获取或更新颜色缓存
-    pub fn cached_colors_get(&self, uri: &Url, content_hash: u64) -> Option<Vec<ColorInformation>> {
-        let cache = self.color_cache.read().expect("Failed to read color cache");
-        cache.get(uri).and_then(|cached| {
-            if cached.content_hash == content_hash {
-                Some(cached.colors.clone())
-            } else {
-                None
-            }
-        })
+    pub fn get_color(&self, uri: &Url, content_hash: u64) -> Option<Vec<ColorInformation>> {
+        self.color_cache
+            .read()
+            .expect("Failed to read color cache")
+            .get(uri)
+            .and_then(|cached| {
+                if cached.content_hash == content_hash {
+                    Some(cached.colors.clone())
+                } else {
+                    None
+                }
+            })
     }
 
     // 更新颜色缓存
-    pub fn color_cache_set(&mut self, uri: &Url, content_hash: u64, colors: Vec<ColorInformation>) {
-        let mut cache = self
-            .color_cache
+    pub fn set_color(&mut self, uri: &Url, content_hash: u64, colors: Vec<ColorInformation>) {
+        self.color_cache
             .write()
-            .expect("Failed to write color cache");
-        cache.insert(
-            uri.clone(),
-            CachedColors {
-                content_hash,
-                colors,
-            },
-        );
+            .expect("Failed to write color cache")
+            .insert(
+                uri.clone(),
+                CachedColors {
+                    content_hash,
+                    colors,
+                },
+            );
     }
 
     // 清理颜色缓存
-    pub fn color_cache_clear(&mut self, uri: &Url) {
-        let mut cache = self
-            .color_cache
+    pub fn clear_color(&mut self, uri: &Url) {
+        self.color_cache
             .write()
-            .expect("Failed to write color cache");
-        cache.remove(uri);
+            .expect("Failed to write color cache")
+            .remove(uri);
     }
 
     pub fn execute_command(&self, command: &str) -> anyhow::Result<()> {
