@@ -474,7 +474,7 @@ dependencies = [
 
 [[package]]
 name = "hx-lsp"
-version = "0.2.10"
+version = "0.2.11"
 dependencies = [
  "aho-corasick",
  "anyhow",

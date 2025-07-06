@@ -22,7 +22,7 @@ pub struct State {
     documents: Arc<RwLock<HashMap<Url, Rope>>>,
     hash: Arc<RwLock<HashMap<Url, u64>>>,
     language_ids: Arc<RwLock<HashMap<Url, String>>>,
-    color_cache: Arc<RwLock<HashMap<Url, CachedColors>>>, // 新增颜色缓存
+    color_cache: Arc<RwLock<HashMap<Url, CachedColors>>>,
     action_cache: Arc<RwLock<HashMap<String, ActionData>>>,
 }
 
@@ -32,7 +32,13 @@ pub struct ClientInfo {
     pub version: String,
 }
 
-// 新增缓存结构
+// #[derive(Default, Clone)]
+// struct Document {
+//     pub hash_id: u64,
+//     pub document: Rope,
+//     pub language_id: String,
+// }
+
 #[derive(Debug, Clone)]
 struct CachedColors {
     content_hash: u64,
@@ -64,10 +70,6 @@ impl State {
         {
             *doc = hash;
         }
-
-        // let mut doc = self.hash.write().expect("Failed to read documents");
-        // let id = doc.get_mut(uri).unwrap();
-        // *id = hash;
     }
 
     fn get_hash(&self, uri: &Url) -> u64 {
