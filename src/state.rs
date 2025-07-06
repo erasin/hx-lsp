@@ -17,12 +17,13 @@ use crate::{
 
 #[derive(Default, Clone)]
 pub struct State {
-    pub root: PathBuf,
-    pub documents: Arc<RwLock<HashMap<Url, Rope>>>,
-    pub language_ids: Arc<RwLock<HashMap<Url, String>>>,
-    pub color_cache: Arc<RwLock<HashMap<Url, CachedColors>>>, // 新增颜色缓存
+    pub(crate) root: PathBuf,
     pub client_info: ClientInfo,
-    pub action_cache: Arc<RwLock<HashMap<String, ActionData>>>,
+    documents: Arc<RwLock<HashMap<Url, Rope>>>,
+    hash: Arc<RwLock<HashMap<Url, u64>>>,
+    language_ids: Arc<RwLock<HashMap<Url, String>>>,
+    color_cache: Arc<RwLock<HashMap<Url, CachedColors>>>, // 新增颜色缓存
+    action_cache: Arc<RwLock<HashMap<String, ActionData>>>,
 }
 
 #[derive(Default, Clone)]
@@ -33,22 +34,49 @@ pub struct ClientInfo {
 
 // 新增缓存结构
 #[derive(Debug, Clone)]
-pub struct CachedColors {
+struct CachedColors {
     content_hash: u64,
     colors: Vec<ColorInformation>,
 }
 
 impl State {
     // 计算文档内容的哈希值
-    pub fn calculate_content_hash(&self, uri: &Url) -> u64 {
+    fn calculate_hash(&self, uri: &Url) -> Option<u64> {
         let documents = self.documents.read().expect("Failed to read documents");
-        let mut hasher = DefaultHasher::new();
 
         if let Some(content) = documents.get(uri) {
+            let mut hasher = DefaultHasher::new();
             content.chunks().for_each(|chunk| chunk.hash(&mut hasher));
+            Some(hasher.finish())
+        } else {
+            None
+        }
+    }
+
+    fn set_hash(&self, uri: &Url) {
+        let hash = self.calculate_hash(uri).unwrap_or_default();
+
+        if let Some(doc) = self
+            .hash
+            .write()
+            .expect("Failed to read documents")
+            .get_mut(uri)
+        {
+            *doc = hash;
         }
 
-        hasher.finish()
+        // let mut doc = self.hash.write().expect("Failed to read documents");
+        // let id = doc.get_mut(uri).unwrap();
+        // *id = hash;
+    }
+
+    fn get_hash(&self, uri: &Url) -> u64 {
+        self.hash
+            .read()
+            .expect("Get Document Hash Fail")
+            .get(uri)
+            .cloned()
+            .unwrap_or(self.calculate_hash(uri).unwrap())
     }
 
     pub fn get_document(&self, uri: &Url) -> Rope {
@@ -85,6 +113,7 @@ impl State {
             docs.insert(uri.clone(), content);
         }
 
+        self.set_hash(uri);
         // 清理色彩
         self.clear_color(uri);
     }
@@ -101,6 +130,7 @@ impl State {
             }
         };
         if changed {
+            self.set_hash(uri);
             // 内容变更时清除缓存
             self.clear_color(uri);
         }
@@ -127,6 +157,7 @@ impl State {
             }
         }
 
+        self.set_hash(uri);
         self.clear_color(uri);
     }
 
@@ -151,7 +182,7 @@ impl State {
     }
 
     /// 客户端信息
-    pub fn update_client_info(&mut self, name: String, version: String) {
+    pub fn set_client_info(&mut self, name: String, version: String) {
         self.client_info = ClientInfo { name, version };
     }
 
@@ -178,7 +209,8 @@ impl State {
     }
 
     /// 获取或更新颜色缓存
-    pub fn get_color(&self, uri: &Url, content_hash: u64) -> Option<Vec<ColorInformation>> {
+    pub fn get_color(&self, uri: &Url) -> Option<Vec<ColorInformation>> {
+        let content_hash = self.get_hash(uri);
         self.color_cache
             .read()
             .expect("Failed to read color cache")
@@ -193,7 +225,8 @@ impl State {
     }
 
     // 更新颜色缓存
-    pub fn set_color(&mut self, uri: &Url, content_hash: u64, colors: Vec<ColorInformation>) {
+    pub fn set_color(&mut self, uri: &Url, colors: Vec<ColorInformation>) {
+        let content_hash = self.get_hash(uri);
         self.color_cache
             .write()
             .expect("Failed to write color cache")

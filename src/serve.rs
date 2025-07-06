@@ -126,10 +126,9 @@ impl LanguageServer for Server {
         let unknown = "unknown".to_owned();
         if let Some(client_info) = params.client_info {
             let client_version = client_info.version.unwrap_or(unknown);
-            self.state
-                .update_client_info(client_info.name, client_version);
+            self.state.set_client_info(client_info.name, client_version);
         } else {
-            self.state.update_client_info("web".to_owned(), unknown);
+            self.state.set_client_info("web".to_owned(), unknown);
         };
         Box::pin(async move {
             Ok(InitializeResult {
@@ -382,15 +381,13 @@ impl LanguageServer for Server {
         let uri = params.text_document.uri;
         let doc = self.state.get_document(&uri);
 
-        let current_hash = self.state.calculate_content_hash(&uri);
-
         // 尝试获取缓存
-        let colors = if let Some(cached_colors) = self.state.get_color(&uri, current_hash) {
+        let colors = if let Some(cached_colors) = self.state.get_color(&uri) {
             cached_colors
         } else {
             // 缓存处理
             let colors = extract_colors(&doc);
-            self.state.set_color(&uri, current_hash, colors.clone());
+            self.state.set_color(&uri, colors.clone());
             colors
         };
 
