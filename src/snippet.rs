@@ -244,7 +244,7 @@ mod test {
         let root = std::env::current_dir().ok().unwrap();
         let lang = Snippets::get_lang("markdown".to_owned(), &root);
 
-        println!("{:?}", lang);
+        println!("{lang:?}");
         assert_eq!(lang.name, "markdown".to_owned(),);
         assert!(lang.snippets.contains_key("markdown a"));
     }

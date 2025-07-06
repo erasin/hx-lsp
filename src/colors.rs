@@ -392,12 +392,7 @@ mod tests {
         for (input, expected) in cases {
             let result = func(&input.to_lowercase());
             println!("--> {input} {result:?} {expected:?}");
-            assert_eq!(
-                result.is_some(),
-                expected.is_some(),
-                "Failed case: {}",
-                input
-            );
+            assert_eq!(result.is_some(), expected.is_some(), "Failed case: {input}",);
             if let Some(expected_values) = expected {
                 assert_color_eq(&result.unwrap(), *expected_values);
             }
@@ -517,8 +512,7 @@ mod tests {
         for input in cases {
             assert!(
                 parse_color(input).is_none(),
-                "Should reject invalid input: {}",
-                input
+                "Should reject invalid input: {input}"
             );
         }
     }
