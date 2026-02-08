@@ -117,10 +117,10 @@ impl LanguageServer for Server {
         params: InitializeParams,
     ) -> BoxFuture<'static, Result<InitializeResult, Self::Error>> {
         //  文件夹中存在多个 .helix 的目录问题
-        if let Some(ws) = params.workspace_folders.clone() {
-            if !ws.is_empty() {
-                self.state.root = ws.first().unwrap().uri.to_file_path().unwrap();
-            }
+        if let Some(ws) = params.workspace_folders.clone()
+            && !ws.is_empty()
+        {
+            self.state.root = ws.first().unwrap().uri.to_file_path().unwrap();
         };
 
         let unknown = "unknown".to_owned();
@@ -248,7 +248,7 @@ impl LanguageServer for Server {
         let snippets = match get_current_word(&line, pos.character as usize) {
             Some(word) => {
                 cursor_word = word.to_string();
-                snippets.filter(word).ok().unwrap()
+                snippets.filter(word)
             }
             None => snippets,
         };

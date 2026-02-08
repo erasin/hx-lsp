@@ -3,7 +3,6 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::Result;
 use async_lsp::lsp_types::{CompletionItem, CompletionItemKind};
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
@@ -186,7 +185,7 @@ impl Snippets {
             })
     }
 
-    pub fn filter(&self, word: &str) -> Result<Snippets> {
+    pub fn filter(&self, word: &str) -> Snippets {
         let names: HashMap<String, String> = self
             .clone()
             .snippets
@@ -201,7 +200,7 @@ impl Snippets {
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect();
 
-        Ok(Snippets::new(self.name.clone(), re))
+        Snippets::new(self.name.clone(), re)
     }
 }
 
