@@ -166,8 +166,8 @@ impl Actions {
         data: &ActionData,
     ) -> Vec<(CodeAction, ActionData)> {
         self.actions
-            .iter()
-            .filter_map(|(_name, action)| action.to_code_action_item(variable_init, data))
+            .values()
+            .filter_map(|action| action.to_code_action_item(variable_init, data))
             .collect()
     }
 
