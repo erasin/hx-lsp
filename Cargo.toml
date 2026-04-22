@@ -44,6 +44,7 @@ which = "6.0"
 
 [target.'cfg(windows)'.dependencies]
 tokio-util = { version = "0.7", features = ["compat"] }
+tokio = { version = "1.42", features = ["macros", "rt", "time", "io-util", "sync", "io-std"] }
 
 [profile.release]
 opt-level = "z"
