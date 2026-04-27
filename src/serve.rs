@@ -237,7 +237,10 @@ impl LanguageServer for Server {
             lang
         });
 
-        let line = doc.get_line(pos.line as usize).unwrap();
+        let line = match doc.get_line(pos.line as usize) {
+            Some(line) => line,
+            None => return Box::pin(async move { Ok(None) }),
+        };
 
         if is_field(&line, pos.character as usize) {
             return Box::pin(async move { Ok(None) });
@@ -259,7 +262,7 @@ impl LanguageServer for Server {
         };
 
         let variable_init = VariableInit {
-            file_path: uri.to_file_path().unwrap(),
+            file_path: uri.to_file_path().unwrap_or_default(),
             work_path: root.clone(),
             line_pos: params.text_document_position.position.line as usize,
             cursor_pos: pos.character as usize,
@@ -288,12 +291,16 @@ impl LanguageServer for Server {
         let root = state.root.clone();
 
         // 当前行
-        let line = doc.get_line(params.range.end.line as usize).unwrap();
+        let line = match doc.get_line(params.range.end.line as usize) {
+            Some(line) => line,
+            None => return Box::pin(async move { Ok(None) }),
+        };
         // 当前 word
         let cursor_word =
             get_current_word(&line, params.range.end.character as usize).unwrap_or_default();
         // 当前 选择区域
-        let range_content = get_range_content(&doc, &params.range).unwrap_or("".into());
+        let range_content = get_range_content(&doc, &params.range);
+        let range_content_str = range_content.as_ref().map(|s| s.to_string());
 
         let clipboard_content = match ClipboardContext::new() {
             Ok(mut clip) => clip.get_contents().ok(),
@@ -301,13 +308,13 @@ impl LanguageServer for Server {
         };
 
         let variable_init = VariableInit {
-            file_path: uri.to_file_path().unwrap(),
+            file_path: uri.to_file_path().unwrap_or_default(),
             work_path: root.clone(),
             line_pos: params.range.start.line as usize,
             cursor_pos: params.range.end.character as usize,
             line_text: line.to_string(),
             current_word: cursor_word.to_string(),
-            selected_text: range_content.to_string(),
+            selected_text: range_content_str.unwrap_or_default(),
             clipboard: clipboard_content,
         };
 
@@ -320,7 +327,7 @@ impl LanguageServer for Server {
                 self.state.set_action(action.title.clone(), data.clone());
                 action.clone().into()
             })
-            .chain(case_actions(range_content, &params))
+            .chain(case_actions(*range_content.as_ref().unwrap_or(&Rope::from("").slice(..)), &params))
             .chain(markdown::actions(lang_id, &doc, &params))
             .collect();
 

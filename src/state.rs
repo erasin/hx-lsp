@@ -72,13 +72,13 @@ impl State {
         }
     }
 
-    fn get_hash(&self, uri: &Url) -> u64 {
+    fn get_hash(&self, uri: &Url) -> Option<u64> {
         self.hash
             .read()
             .expect("Get Document Hash Fail")
             .get(uri)
             .cloned()
-            .unwrap_or(self.calculate_hash(uri).unwrap())
+            .or_else(|| self.calculate_hash(uri))
     }
 
     pub fn get_document(&self, uri: &Url) -> Rope {
@@ -148,11 +148,13 @@ impl State {
         {
             for content in contents {
                 if let Some(range) = content.range {
-                    let start = position_to_char_index(doc, range.start);
-                    let end = position_to_char_index(doc, range.end);
-
-                    doc.remove(start..end);
-                    doc.insert(start, &content.text);
+                    if let (Ok(start), Ok(end)) = (
+                        position_to_char_index(doc, range.start),
+                        position_to_char_index(doc, range.end),
+                    ) {
+                        doc.remove(start..end);
+                        doc.insert(start, &content.text);
+                    }
                 } else {
                     *doc = Rope::from_str(&content.text);
                 }
@@ -176,7 +178,7 @@ impl State {
         self.color_cache
             .write()
             .expect("Failed to write color cache")
-            .remove(uri); // 移除文件时清除缓存
+            .remove(uri);
         self.action_cache
             .write()
             .expect("Failed to write action cache")
@@ -212,7 +214,7 @@ impl State {
 
     /// 获取或更新颜色缓存
     pub fn get_color(&self, uri: &Url) -> Option<Vec<ColorInformation>> {
-        let content_hash = self.get_hash(uri);
+        let content_hash = self.get_hash(uri).unwrap_or_default();
         self.color_cache
             .read()
             .expect("Failed to read color cache")
@@ -226,9 +228,9 @@ impl State {
             })
     }
 
-    // 更新颜色缓存
+    /// 更新颜色缓存
     pub fn set_color(&mut self, uri: &Url, colors: Vec<ColorInformation>) {
-        let content_hash = self.get_hash(uri);
+        let content_hash = self.get_hash(uri).unwrap_or_default();
         self.color_cache
             .write()
             .expect("Failed to write color cache")
@@ -241,7 +243,7 @@ impl State {
             );
     }
 
-    // 清理颜色缓存
+    /// 清理颜色缓存
     pub fn clear_color(&mut self, uri: &Url) {
         self.color_cache
             .write()
@@ -264,9 +266,9 @@ impl State {
     }
 }
 
-// convert lsp position to Rope position
-pub(crate) fn position_to_char_index(doc: &Rope, position: Position) -> usize {
-    // rope.line_to_char(position.line as usize) + (position.character as usize)
+/// LSP 位置转换为 Rope 字符索引
+/// 返回 Result 以避免越界时 panic
+pub(crate) fn position_to_char_index(doc: &Rope, position: Position) -> Result<usize, &'static str> {
     let offset_encoding = OffsetEncoding::Utf16;
-    lsp_pos_to_pos(doc, position, offset_encoding).unwrap()
+    lsp_pos_to_pos(doc, position, offset_encoding).map_err(|_| "position out of bounds")
 }

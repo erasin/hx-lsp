@@ -55,21 +55,20 @@ pub fn apply_content_change(
     let offset_encoding = OffsetEncoding::Utf16;
     match change.range {
         Some(range) => {
-            assert!(
-                range.start.line < range.end.line
-                    || (range.start.line == range.end.line
-                        && range.start.character <= range.end.character)
-            );
+            if range.start.line > range.end.line
+                || (range.start.line == range.end.line
+                    && range.start.character > range.end.character)
+            {
+                return Err(Error::PositionOutOfBounds(range.start.line, range.start.character));
+            }
 
-            // 获取 line 中的索引
             let change_start_doc_char_idx =
-                lsp_pos_to_pos(doc, range.start, offset_encoding).unwrap();
+                lsp_pos_to_pos(doc, range.start, offset_encoding)?;
             let change_end_doc_char_idx = match range.start == range.end {
                 true => change_start_doc_char_idx,
-                false => lsp_pos_to_pos(doc, range.end, offset_encoding).unwrap(),
+                false => lsp_pos_to_pos(doc, range.end, offset_encoding)?,
             };
 
-            // 移除区域并插入新的文本
             doc.remove(change_start_doc_char_idx..change_end_doc_char_idx);
             doc.insert(change_start_doc_char_idx, &change.text);
         }
@@ -136,10 +135,10 @@ pub fn get_range_content<'a>(doc: &'a Rope, range: &Range) -> Option<RopeSlice<'
         return None;
     }
 
-    let start_idx = lsp_pos_to_pos(doc, range.start, offset_encoding).unwrap();
+    let start_idx = lsp_pos_to_pos(doc, range.start, offset_encoding).ok()?;
     let end_idx = match range.start == range.end {
         true => start_idx,
-        false => lsp_pos_to_pos(doc, range.end, offset_encoding).unwrap(),
+        false => lsp_pos_to_pos(doc, range.end, offset_encoding).ok()?,
     };
     let s = doc.slice(start_idx..end_idx);
     Some(s)
