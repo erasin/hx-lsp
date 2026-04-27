@@ -136,9 +136,11 @@ pub fn get_range_content<'a>(doc: &'a Rope, range: &Range) -> Option<RopeSlice<'
     }
 
     let start_idx = lsp_pos_to_pos(doc, range.start, offset_encoding).ok()?;
-    let end_idx = match range.start == range.end {
-        true => start_idx,
-        false => lsp_pos_to_pos(doc, range.end, offset_encoding).ok()?,
+    let end_idx = if range.start == range.end {
+        let line_char_start = doc.line_to_char(range.start.line as usize);
+        line_char_start + doc.line(range.start.line as usize).len_chars()
+    } else {
+        lsp_pos_to_pos(doc, range.end, offset_encoding).ok()?
     };
     let s = doc.slice(start_idx..end_idx);
     Some(s)
