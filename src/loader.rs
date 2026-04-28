@@ -28,9 +28,12 @@ impl std::fmt::Display for Dirs {
 }
 
 pub fn config_dir(d: Dirs) -> PathBuf {
-    let strategy = choose_base_strategy().expect("Unable to find the config directory!");
+    let strategy = match choose_base_strategy() {
+        Ok(s) => s,
+        Err(_) => return PathBuf::new(),
+    };
     let mut path = strategy.config_dir();
-    path.push("helix"); // set editor ?
+    path.push("helix");
     path.push(d.to_string());
     path
 }

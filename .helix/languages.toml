@@ -4,8 +4,8 @@ command = "target/debug/hx-lsp"
 args = ["--log"] # for dev
 
 [language-server.hx-lsp.config]
-markdown = false
-documentColor = false
+markdown = true
+documentColor = true
 
 [[language]]
 name = "markdown"

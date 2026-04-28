@@ -38,6 +38,8 @@ use crate::{
     variables::VariableInit,
 };
 
+static EMPTY_ROPE: std::sync::OnceLock<Rope> = std::sync::OnceLock::new();
+
 /// LSP 服务器
 pub struct Server {
     #[allow(unused)]
@@ -59,6 +61,10 @@ impl Server {
 
     fn on_tick(&mut self, _: TickEvent) -> ControlFlow<async_lsp::Result<()>> {
         ControlFlow::Continue(())
+    }
+
+    fn get_clipboard_content() -> Option<String> {
+        ClipboardContext::new().ok()?.get_contents().ok()
     }
 
     pub async fn run() {
@@ -94,16 +100,23 @@ impl Server {
 
         // Prefer truly asynchronous piped stdin/stdout without blocking tasks.
         #[cfg(unix)]
-        let (stdin, stdout) = (
-            async_lsp::stdio::PipeStdin::lock_tokio().unwrap(),
-            async_lsp::stdio::PipeStdout::lock_tokio().unwrap(),
-        );
-        // Fallback to spawn blocking read/write otherwise.
+        let (stdin, stdout) = match (
+            async_lsp::stdio::PipeStdin::lock_tokio(),
+            async_lsp::stdio::PipeStdout::lock_tokio(),
+        ) {
+            (Ok(stdin), Ok(stdout)) => (stdin, stdout),
+            (Err(e), _) => panic!("Failed to lock stdin: {e}"),
+            (_, Err(e)) => panic!("Failed to lock stdout: {e}"),
+        };
         #[cfg(not(unix))]
-        let (stdin, stdout) = (
-            tokio_util::compat::TokioAsyncReadCompatExt::compat(tokio::io::stdin()),
-            tokio_util::compat::TokioAsyncWriteCompatExt::compat_write(tokio::io::stdout()),
-        );
+        let (stdin, stdout) = {
+            let stdin = tokio::io::stdin();
+            let stdout = tokio::io::stdout();
+            (
+                tokio_util::compat::TokioAsyncReadCompatExt::compat(stdin),
+                tokio_util::compat::TokioAsyncWriteCompatExt::compat_write(stdout),
+            )
+        };
 
         server.run_buffered(stdin, stdout).await.unwrap();
     }
@@ -120,8 +133,10 @@ impl LanguageServer for Server {
         //  文件夹中存在多个 .helix 的目录问题
         if let Some(ws) = params.workspace_folders.clone()
             && !ws.is_empty()
+            && let Some(first) = ws.first()
+            && let Ok(path) = first.uri.to_file_path()
         {
-            self.state.root = ws.first().unwrap().uri.to_file_path().unwrap();
+            self.state.root = path;
         };
 
         let unknown = "unknown".to_owned();
@@ -218,7 +233,7 @@ impl LanguageServer for Server {
 
     fn did_save(&mut self, params: DidSaveTextDocumentParams) -> Self::NotifyResult {
         let uri = params.text_document.uri;
-        let content = Rope::from(params.text.unwrap());
+        let content = params.text.map(Rope::from).unwrap_or_default();
         self.state.on_document_save(&uri, content);
         ControlFlow::Continue(())
     }
@@ -273,10 +288,7 @@ impl LanguageServer for Server {
             None => snippets,
         };
 
-        let clipboard_content = match ClipboardContext::new() {
-            Ok(mut clip) => clip.get_contents().ok(),
-            Err(_) => None,
-        };
+        let clipboard_content = Self::get_clipboard_content();
 
         let variable_init = VariableInit {
             file_path: uri.to_file_path().unwrap_or_default(),
@@ -319,10 +331,7 @@ impl LanguageServer for Server {
         let range_content = get_range_content(&doc, &params.range);
         let range_content_str = range_content.as_ref().map(|s| s.to_string());
 
-        let clipboard_content = match ClipboardContext::new() {
-            Ok(mut clip) => clip.get_contents().ok(),
-            Err(_) => None,
-        };
+        let clipboard_content = Self::get_clipboard_content();
 
         let variable_init = VariableInit {
             file_path: uri.to_file_path().unwrap_or_default(),
@@ -350,7 +359,7 @@ impl LanguageServer for Server {
                 self.state.set_action(action.title.clone(), data.clone());
                 action.clone().into()
             })
-            .chain(case_actions(*range_content.as_ref().unwrap_or(&Rope::from("").slice(..)), &params))
+            .chain(case_actions(*range_content.as_ref().unwrap_or(&EMPTY_ROPE.get_or_init(Rope::new).slice(..)), &params))
             .chain(markdown_actions)
             .collect();
 
@@ -359,9 +368,10 @@ impl LanguageServer for Server {
 
     fn code_action_resolve(
         &mut self,
-        params: CodeAction,
+        mut params: CodeAction,
     ) -> BoxFuture<'static, Result<CodeAction, ResponseError>> {
-        let data = if let Some(data) = self.state.get_action(params.title.clone()) {
+        let title = params.title.clone();
+        let data = if let Some(data) = self.state.get_action(title) {
             data
         } else {
             return Box::pin(async move { Ok(params) });
@@ -381,15 +391,13 @@ impl LanguageServer for Server {
             None
         };
 
-        // 设置 title 和 tooltip
-        let mut resolved_action = params.clone();
+        let resolved_action = &mut params;
 
         if let Some(output) = data
             .command
             .and_then(|cmd| shell(&cmd, &selected).ok())
             .filter(|o| !o.is_empty())
         {
-            // resolved_action.data = Some(serde_json::to_value(output.clone()).unwrap());
             resolved_action.data = None;
             let mut changes = HashMap::new();
             let edits = vec![TextEdit {
@@ -401,7 +409,7 @@ impl LanguageServer for Server {
             resolved_action.kind = Some(CodeActionKind::REFACTOR_REWRITE);
         }
 
-        Box::pin(async move { Ok(resolved_action) })
+        Box::pin(async move { Ok(params) })
     }
 
     fn document_color(
