@@ -30,6 +30,7 @@ use crate::{
     action::{Actions, shell},
     action_inner::case_actions,
     colors::extract_colors,
+    config::LspConfig,
     encoding::{get_current_word, get_range_content, is_field},
     markdown,
     snippet::Snippets,
@@ -130,6 +131,12 @@ impl LanguageServer for Server {
         } else {
             self.state.set_client_info("web".to_owned(), unknown);
         };
+
+        if let Some(initialization_options) = params.initialization_options {
+            let config = LspConfig::from_json(&initialization_options);
+            self.state.set_config(config);
+        }
+
         Box::pin(async move {
             Ok(InitializeResult {
                 capabilities: ServerCapabilities {
@@ -180,8 +187,12 @@ impl LanguageServer for Server {
 
     fn did_change_configuration(
         &mut self,
-        _: DidChangeConfigurationParams,
+        params: DidChangeConfigurationParams,
     ) -> ControlFlow<async_lsp::Result<()>> {
+        let config = LspConfig::from_json(&params.settings);
+        self.state.set_config(config);
+        tracing::info!("Configuration updated: markdown={}, documentColor={}",
+            self.state.config.markdown, self.state.config.document_color);
         ControlFlow::Continue(())
     }
 
@@ -227,15 +238,21 @@ impl LanguageServer for Server {
         let doc = self.state.get_document(&uri);
         let lang_id = self.state.get_language_id(&uri);
         let root = self.state.root.clone();
-        let snippets = [
-            Snippets::get_lang(lang_id.clone(), &root),
-            Snippets::get_global(&root),
-        ]
-        .into_iter()
-        .fold(Snippets::default(), |mut lang, other| {
-            lang.extend(other);
-            lang
-        });
+        let markdown_disabled = !self.state.config.markdown;
+
+        let snippets = if markdown_disabled && lang_id == "markdown" {
+            Snippets::get_global(&root)
+        } else {
+            [
+                Snippets::get_lang(lang_id.clone(), &root),
+                Snippets::get_global(&root),
+            ]
+            .into_iter()
+            .fold(Snippets::default(), |mut lang, other| {
+                lang.extend(other);
+                lang
+            })
+        };
 
         let line = match doc.get_line(pos.line as usize) {
             Some(line) => line,
@@ -320,6 +337,12 @@ impl LanguageServer for Server {
 
         let actions = Actions::get_lang(lang_id.clone(), &variable_init);
 
+        let markdown_actions = if self.state.config.markdown {
+            markdown::actions(lang_id, &doc, &params)
+        } else {
+            Vec::new()
+        };
+
         let actions = actions
             .to_code_action_items(&variable_init, &params.clone().into())
             .iter()
@@ -328,7 +351,7 @@ impl LanguageServer for Server {
                 action.clone().into()
             })
             .chain(case_actions(*range_content.as_ref().unwrap_or(&Rope::from("").slice(..)), &params))
-            .chain(markdown::actions(lang_id, &doc, &params))
+            .chain(markdown_actions)
             .collect();
 
         Box::pin(async move { Ok(Some(actions)) })
@@ -385,6 +408,10 @@ impl LanguageServer for Server {
         &mut self,
         params: DocumentColorParams,
     ) -> BoxFuture<'static, Result<Vec<ColorInformation>, ResponseError>> {
+        if !self.state.config.document_color {
+            return Box::pin(async move { Ok(Vec::new()) });
+        }
+
         let uri = params.text_document.uri;
         let doc = self.state.get_document(&uri);
 

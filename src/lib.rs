@@ -5,6 +5,7 @@
 pub mod action;
 pub mod action_inner;
 pub mod colors;
+pub mod config;
 pub mod encoding;
 pub mod env;
 pub mod errors;

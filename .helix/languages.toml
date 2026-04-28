@@ -3,6 +3,10 @@ command = "target/debug/hx-lsp"
 # command = "hx-lsp"
 args = ["--log"] # for dev
 
+[language-server.hx-lsp.config]
+markdown = false
+documentColor = false
+
 [[language]]
 name = "markdown"
 language-servers = ["hx-lsp"]

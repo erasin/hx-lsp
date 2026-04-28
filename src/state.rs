@@ -11,6 +11,7 @@ use tracing::debug;
 
 use crate::{
     action::{ActionData, actions_list_clear},
+    config::LspConfig,
     encoding::{OffsetEncoding, lsp_pos_to_pos},
     snippet::snippets_list_clear,
 };
@@ -19,6 +20,7 @@ use crate::{
 pub struct State {
     pub(crate) root: PathBuf,
     pub client_info: ClientInfo,
+    pub config: LspConfig,
     documents: Arc<RwLock<HashMap<Url, Rope>>>,
     hash: Arc<RwLock<HashMap<Url, u64>>>,
     language_ids: Arc<RwLock<HashMap<Url, String>>>,
@@ -249,6 +251,14 @@ impl State {
             .write()
             .expect("Failed to write color cache")
             .remove(uri);
+    }
+
+    pub fn config(&self) -> LspConfig {
+        self.config.clone()
+    }
+
+    pub fn set_config(&mut self, config: LspConfig) {
+        self.config = config;
     }
 
     pub fn execute_command(&self, command: &str) -> anyhow::Result<()> {

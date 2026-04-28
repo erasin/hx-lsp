@@ -50,9 +50,11 @@ cargo install --path .
 
 ## Configuration
 
+hx-lsp is configured through Helix's `languages.toml` file using the [TOML](https://toml.io/) format.
+
 ### Helix Language Configuration
 
-Edit Helix's language configuration file `languages.toml`:
+Helix uses `languages.toml` for LSP and language server configuration:
 
 - Global: `$XDG_CONFIG_HOME/helix/languages.toml`
 - Project: `WORKSPACE_ROOT/.helix/languages.toml`
@@ -61,21 +63,25 @@ Edit Helix's language configuration file `languages.toml`:
 
 #### Configuration Example
 
-Add hx-lsp support for Markdown:
+Add hx-lsp support for Markdown with custom configuration:
 
 ```toml
 [language-server.hx-lsp]
 command = "hx-lsp"
 
+[language-server.hx-lsp.config]
+markdown = false              # Disable markdown features
+documentColor = true         # Enable document color
+
 [[language]]
 name = "markdown"
-language-servers = ["marksman", "markdown-oxide", "hx-lsp"]
+language-servers = ["hx-lsp"]
 
-# Or enable only specific features
+[[language]]
+name = "html"
 language-servers = [
-  "marksman",
-  "markdown-oxide",
-  { name = "hx-lsp", only-features = ["document-colors"] }
+  "vscode-html-language-server",
+  "hx-lsp"
 ]
 ```
 
@@ -85,6 +91,47 @@ Helix supports filtering LSP features using `only-features` and `except-features
 - `completion` - Code completion
 - `code-action` - Code actions
 - `document-colors` - Document colors
+
+### LSP Configuration Protocol
+
+hx-lsp supports dynamic configuration via the LSP protocol. Configuration can be passed through:
+
+1. **`language-server.hx-lsp.config`** in `languages.toml` (TOML format)
+2. **`initializationOptions`** during server initialization (JSON format)
+
+#### Configuration Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `markdown` | `boolean` | `true` | Enable/disable markdown language features |
+| `documentColor` | `boolean` | `true` | Enable/disable document color provider |
+
+#### Configuration Formats
+
+**TOML format (in languages.toml)**:
+
+```toml
+[language-server.hx-lsp.config]
+markdown = false
+documentColor = true
+```
+
+**JSON format (initializationOptions)**:
+
+```json
+{ "markdown": true, "documentColor": true }
+```
+
+Or nested format:
+
+```json
+{
+  "settings": {
+    "markdown": true,
+    "documentColor": true
+  }
+}
+```
 
 ---
 

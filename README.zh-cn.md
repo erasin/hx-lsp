@@ -50,9 +50,11 @@ cargo install --path .
 
 ## 配置
 
+hx-lsp 通过 Helix 的 `languages.toml` 文件进行配置，使用 [TOML](https://toml.io/) 格式。
+
 ### Helix 语言配置
 
-编辑 Helix 的语言配置文件 `languages.toml`：
+Helix 使用 `languages.toml` 配置 LSP 和语言服务器：
 
 - 全局配置：`$XDG_CONFIG_HOME/helix/languages.toml`
 - 项目配置：`WORKSPACE_ROOT/.helix/languages.toml`
@@ -61,21 +63,25 @@ cargo install --path .
 
 #### 配置示例
 
-为 Markdown 添加 hx-lsp 支持：
+为 Markdown 添加 hx-lsp 支持并自定义配置：
 
 ```toml
 [language-server.hx-lsp]
 command = "hx-lsp"
 
+[language-server.hx-lsp.config]
+markdown = false              # 禁用 markdown 功能
+documentColor = true         # 启用文档颜色
+
 [[language]]
 name = "markdown"
-language-servers = ["marksman", "markdown-oxide", "hx-lsp"]
+language-servers = ["hx-lsp"]
 
-# 或者仅启用部分功能
+[[language]]
+name = "html"
 language-servers = [
-  "marksman",
-  "markdown-oxide",
-  { name = "hx-lsp", only-features = ["document-colors"] }
+  "vscode-html-language-server",
+  "hx-lsp"
 ]
 ```
 
@@ -85,6 +91,47 @@ Helix 支持使用 `only-features` 和 `except-features` 过滤 LSP 功能，hx-
 - `completion` - 代码补全
 - `code-action` - 代码操作
 - `document-colors` - 文档颜色
+
+### LSP 配置协议
+
+hx-lsp 支持通过 LSP 协议动态配置。配置可通过以下方式传递：
+
+1. **`language-server.hx-lsp.config`** 在 `languages.toml` 中（TOML 格式）
+2. **`initializationOptions`** 在服务器初始化时（JSON 格式）
+
+#### 配置选项
+
+| 选项 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `markdown` | `boolean` | `true` | 启用/禁用 markdown 语言功能 |
+| `documentColor` | `boolean` | `true` | 启用/禁用文档颜色提供者 |
+
+#### 配置格式
+
+**TOML 格式（在 languages.toml 中）**：
+
+```toml
+[language-server.hx-lsp.config]
+markdown = false
+documentColor = true
+```
+
+**JSON 格式（initializationOptions）**：
+
+```json
+{ "markdown": true, "documentColor": true }
+```
+
+或嵌套格式：
+
+```json
+{
+  "settings": {
+    "markdown": true,
+    "documentColor": true
+  }
+}
+```
 
 ---
 
