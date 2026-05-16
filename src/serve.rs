@@ -206,8 +206,11 @@ impl LanguageServer for Server {
     ) -> ControlFlow<async_lsp::Result<()>> {
         let config = LspConfig::from_json(&params.settings);
         self.state.set_config(config);
-        tracing::info!("Configuration updated: markdown={}, documentColor={}",
-            self.state.config.markdown, self.state.config.document_color);
+        tracing::info!(
+            "Configuration updated: markdown={}, documentColor={}",
+            self.state.config.markdown,
+            self.state.config.document_color
+        );
         ControlFlow::Continue(())
     }
 
@@ -359,7 +362,12 @@ impl LanguageServer for Server {
                 self.state.set_action(action.title.clone(), data.clone());
                 action.clone().into()
             })
-            .chain(case_actions(*range_content.as_ref().unwrap_or(&EMPTY_ROPE.get_or_init(Rope::new).slice(..)), &params))
+            .chain(case_actions(
+                *range_content
+                    .as_ref()
+                    .unwrap_or(&EMPTY_ROPE.get_or_init(Rope::new).slice(..)),
+                &params,
+            ))
             .chain(markdown_actions)
             .collect();
 

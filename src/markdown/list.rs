@@ -1,24 +1,21 @@
 use std::collections::HashMap;
 
 use async_lsp::lsp_types::{Position, Range, TextEdit};
-use comrak::{
-    Arena, ComrakOptions, ExtensionOptions,
-    parse_document,
-};
+use comrak::{Arena, ComrakOptions, ExtensionOptions, parse_document};
 use ropey::{Rope, RopeSlice};
 
 /// 列表转换类型枚举
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[allow(dead_code)]
 pub enum ListType {
-    Ordered,              // 有序列表 (1., 2., 3.)
-    Unordered,           // 无序列表 (-, *, +)
-    TaskList,            // 任务列表 (- [ ])
-    TaskListChecked,     // 任务列表已选中 (- [x])
-    UnorderedToTask,     // 无序列表 → 任务列表 (未选中)
-    OrderedToTask,       // 有序列表 → 任务列表
-    TaskToUnordered,     // 任务列表 → 无序列表
-    ToggleTask,          // 切换任务列表 checkbox 状态
+    Ordered,         // 有序列表 (1., 2., 3.)
+    Unordered,       // 无序列表 (-, *, +)
+    TaskList,        // 任务列表 (- [ ])
+    TaskListChecked, // 任务列表已选中 (- [x])
+    UnorderedToTask, // 无序列表 → 任务列表 (未选中)
+    OrderedToTask,   // 有序列表 → 任务列表
+    TaskToUnordered, // 任务列表 → 无序列表
+    ToggleTask,      // 切换任务列表 checkbox 状态
 }
 
 /// 检测列表类型的返回值
@@ -140,7 +137,10 @@ pub fn convert_to_list(
     let detected = detect_list_type(rope);
 
     match conversion_type {
-        ListType::Ordered | ListType::Unordered | ListType::TaskList | ListType::TaskListChecked => {
+        ListType::Ordered
+        | ListType::Unordered
+        | ListType::TaskList
+        | ListType::TaskListChecked => {
             if detected != DetectedListType::None {
                 return None;
             }
@@ -159,13 +159,17 @@ pub fn convert_to_list(
             convert_ordered_to_task(rope, range)
         }
         ListType::TaskToUnordered => {
-            if detected != DetectedListType::TaskUnchecked && detected != DetectedListType::TaskChecked {
+            if detected != DetectedListType::TaskUnchecked
+                && detected != DetectedListType::TaskChecked
+            {
                 return None;
             }
             convert_task_to_unordered(rope, range)
         }
         ListType::ToggleTask => {
-            if detected != DetectedListType::TaskUnchecked && detected != DetectedListType::TaskChecked {
+            if detected != DetectedListType::TaskUnchecked
+                && detected != DetectedListType::TaskChecked
+            {
                 return None;
             }
             toggle_task_state(rope, range)
@@ -357,7 +361,9 @@ fn convert_ordered_to_task(rope: RopeSlice, range: Range) -> Option<Vec<TextEdit
                 return None;
             }
 
-            if content_after_indent.starts_with("- [ ] ") || content_after_indent.starts_with("- [x] ") {
+            if content_after_indent.starts_with("- [ ] ")
+                || content_after_indent.starts_with("- [x] ")
+            {
                 return None;
             }
 
@@ -453,11 +459,26 @@ mod tests {
 
     #[test]
     fn test_detect_list_type() {
-        assert_eq!(detect_list_type(rope_from_str("- item").slice(..)), DetectedListType::Unordered);
-        assert_eq!(detect_list_type(rope_from_str("- [ ] item").slice(..)), DetectedListType::TaskUnchecked);
-        assert_eq!(detect_list_type(rope_from_str("- [x] item").slice(..)), DetectedListType::TaskChecked);
-        assert_eq!(detect_list_type(rope_from_str("1. item").slice(..)), DetectedListType::Ordered);
-        assert_eq!(detect_list_type(rope_from_str("plain text").slice(..)), DetectedListType::None);
+        assert_eq!(
+            detect_list_type(rope_from_str("- item").slice(..)),
+            DetectedListType::Unordered
+        );
+        assert_eq!(
+            detect_list_type(rope_from_str("- [ ] item").slice(..)),
+            DetectedListType::TaskUnchecked
+        );
+        assert_eq!(
+            detect_list_type(rope_from_str("- [x] item").slice(..)),
+            DetectedListType::TaskChecked
+        );
+        assert_eq!(
+            detect_list_type(rope_from_str("1. item").slice(..)),
+            DetectedListType::Ordered
+        );
+        assert_eq!(
+            detect_list_type(rope_from_str("plain text").slice(..)),
+            DetectedListType::None
+        );
     }
 
     #[test]
@@ -466,7 +487,10 @@ mod tests {
         assert_eq!(detect_list_type(doc.slice(..)), DetectedListType::Unordered);
 
         let doc = rope_from_str("- [ ] a\n  - [ ] a1\n- [ ] b\n- [ ] c");
-        assert_eq!(detect_list_type(doc.slice(..)), DetectedListType::TaskUnchecked);
+        assert_eq!(
+            detect_list_type(doc.slice(..)),
+            DetectedListType::TaskUnchecked
+        );
     }
 
     #[test]

@@ -278,7 +278,10 @@ impl State {
 
 /// LSP 位置转换为 Rope 字符索引
 /// 返回 Result 以避免越界时 panic
-pub(crate) fn position_to_char_index(doc: &Rope, position: Position) -> Result<usize, &'static str> {
+pub(crate) fn position_to_char_index(
+    doc: &Rope,
+    position: Position,
+) -> Result<usize, &'static str> {
     let offset_encoding = OffsetEncoding::Utf16;
     lsp_pos_to_pos(doc, position, offset_encoding).map_err(|_| "position out of bounds")
 }

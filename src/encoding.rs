@@ -59,11 +59,13 @@ pub fn apply_content_change(
                 || (range.start.line == range.end.line
                     && range.start.character > range.end.character)
             {
-                return Err(Error::PositionOutOfBounds(range.start.line, range.start.character));
+                return Err(Error::PositionOutOfBounds(
+                    range.start.line,
+                    range.start.character,
+                ));
             }
 
-            let change_start_doc_char_idx =
-                lsp_pos_to_pos(doc, range.start, offset_encoding)?;
+            let change_start_doc_char_idx = lsp_pos_to_pos(doc, range.start, offset_encoding)?;
             let change_end_doc_char_idx = match range.start == range.end {
                 true => change_start_doc_char_idx,
                 false => lsp_pos_to_pos(doc, range.end, offset_encoding)?,
